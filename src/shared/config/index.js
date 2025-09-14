@@ -68,7 +68,7 @@ class ConfigManager {
       
       // Feature flags
       features: {
-        gmailNotifications: !!(process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET),
+        telegramNotifications: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
         adminDashboard: true,
         jokeSubmission: true,
         ratingSystem: true

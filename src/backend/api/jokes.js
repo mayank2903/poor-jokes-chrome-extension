@@ -144,24 +144,15 @@ async function handleSubmitJoke(req, res) {
  */
 async function sendSubmissionNotification(submission) {
   try {
-    // Try Gmail API notification
-    if (process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET) {
-      await sendGmailNotification(submission);
+    // Try Telegram notification
+    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+      const { sendSubmissionNotification: sendTelegramNotification } = require('../../lib/telegram-notifications');
+      await sendTelegramNotification(submission);
     }
   } catch (error) {
     console.error('Notification error:', error);
     // Don't fail the request if notifications fail
   }
-}
-
-/**
- * Send Gmail notification
- * @param {Object} submission - Submission object
- */
-async function sendGmailNotification(submission) {
-  // This would integrate with the Gmail API service
-  // For now, just log the submission
-  console.log('Gmail notification would be sent for submission:', submission.id);
 }
 
 module.exports = handler;

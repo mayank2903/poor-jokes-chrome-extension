@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const { validateRequest, logAPIError, logAPISuccess } = require('./validation');
-const { sendApprovalNotification, sendRejectionNotification } = require('../lib/gmail-notifications');
+const { sendApprovalNotification, sendRejectionNotification } = require('../lib/telegram-notifications');
 
 // Initialize Supabase client with service role key for admin operations
 const supabase = createClient(

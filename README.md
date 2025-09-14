@@ -66,10 +66,8 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ADMIN_PASSWORD=your_admin_password
-GMAIL_CLIENT_ID=your_gmail_client_id (optional)
-GMAIL_CLIENT_SECRET=your_gmail_client_secret (optional)
-GMAIL_REFRESH_TOKEN=your_gmail_refresh_token (optional)
-GMAIL_USER_EMAIL=your_email@gmail.com (optional)
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token (optional)
+TELEGRAM_CHAT_ID=your_telegram_chat_id (optional)
 ```
 
 ### 4. Deploy Backend
@@ -255,10 +253,8 @@ Get joke submissions (admin only).
 | `SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes |
 | `ADMIN_PASSWORD` | Admin dashboard password | Yes |
-| `GMAIL_CLIENT_ID` | Gmail API client ID | No |
-| `GMAIL_CLIENT_SECRET` | Gmail API client secret | No |
-| `GMAIL_REFRESH_TOKEN` | Gmail API refresh token | No |
-| `GMAIL_USER_EMAIL` | Gmail user email | No |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token | No |
+| `TELEGRAM_CHAT_ID` | Telegram chat ID | No |
 
 ### Feature Flags
 
@@ -266,10 +262,10 @@ The application supports feature flags in the configuration:
 
 ```javascript
 features: {
-  gmailNotifications: false,  // Gmail API notifications
-  adminDashboard: true,       // Admin dashboard
-  jokeSubmission: true,       // Joke submission
-  ratingSystem: true         // Rating system
+  telegramNotifications: false,  // Telegram bot notifications
+  adminDashboard: true,         // Admin dashboard
+  jokeSubmission: true,         // Joke submission
+  ratingSystem: true           // Rating system
 }
 ```
 
