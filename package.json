@@ -1,0 +1,33 @@
+{
+  "name": "poor-jokes-newtab",
+  "version": "1.0.0",
+  "description": "A new tab extension that shows poor jokes with rating and submission system",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build needed'",
+    "deploy": "node scripts/deploy.js",
+    "deploy:simple": "vercel --prod",
+    "local": "node local-server.js",
+    "test": "npm run local",
+    "test:api": "node tests/api-test.js",
+    "test:all": "npm run test:api",
+    "health": "node -e \"fetch(process.env.API_URL || 'https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app/api/jokes').then(r => r.json()).then(d => console.log('Health:', d.success ? 'OK' : 'FAIL')).catch(e => console.log('Health: FAIL -', e.message))\"",
+    "package:store": "node scripts/package-for-store.js",
+    "store:prepare": "npm run package:store",
+    "generate:icons": "node scripts/generate-icons.js",
+    "icons:web": "open store-assets/icon-generator.html"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "keywords": ["chrome-extension", "jokes", "new-tab"],
+  "author": "Your Name",
+  "license": "MIT"
+}

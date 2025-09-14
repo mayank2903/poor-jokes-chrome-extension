@@ -1,0 +1,25 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#ffc107" stroke="#ff8f00" stroke-width="4"/>
+  
+  <!-- Laughing face -->
+  <circle cx="64" cy="64" r="45" fill="#fff"/>
+  
+  <!-- Eyes -->
+  <circle cx="50" cy="50" r="6" fill="#333"/>
+  <circle cx="78" cy="50" r="6" fill="#333"/>
+  
+  <!-- Smile -->
+  <path d="M 40 75 Q 64 95 88 75" stroke="#333" stroke-width="4" fill="none" stroke-linecap="round"/>
+  
+  <!-- Laugh lines -->
+  <path d="M 35 60 Q 45 65 35 70" stroke="#ff8f00" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M 93 60 Q 83 65 93 70" stroke="#ff8f00" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Speech bubble -->
+  <path d="M 20 30 Q 20 20 30 20 L 50 20 Q 60 20 60 30 L 60 40 Q 60 50 50 50 L 40 50 L 35 55 Z" fill="#fff" stroke="#ff8f00" stroke-width="2"/>
+  
+  <!-- Exclamation marks in speech bubble -->
+  <text x="35" y="40" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ff8f00">!</text>
+  <text x="45" y="40" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ff8f00">!</text>
+</svg>

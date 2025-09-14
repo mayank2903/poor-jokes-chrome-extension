@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 API Test Page</h1>
+    <p>This page tests if the local API server is working correctly.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Get Jokes</h2>
+        <button onclick="testJokes()">Test /api/jokes</button>
+        <div id="jokes-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Get Submissions</h2>
+        <button onclick="testSubmissions()">Test /api/submissions</button>
+        <div id="submissions-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Submit Joke</h2>
+        <button onclick="testSubmitJoke()">Test Submit Joke</button>
+        <div id="submit-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Rate Joke</h2>
+        <button onclick="testRateJoke()">Test Rate Joke</button>
+        <div id="rate-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 5: All Tests</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <div id="all-results" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+
+        async function testJokes() {
+            const resultDiv = document.getElementById('jokes-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/jokes`);
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testSubmissions() {
+            const resultDiv = document.getElementById('submissions-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/submissions?status=pending`);
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testSubmitJoke() {
+            const resultDiv = document.getElementById('submit-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/jokes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: 'Test joke from API test page',
+                        submitted_by: 'test_user'
+                    })
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testRateJoke() {
+            const resultDiv = document.getElementById('rate-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/rate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        joke_id: '1',
+                        user_id: 'test_user',
+                        rating: 1
+                    })
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function runAllTests() {
+            const resultDiv = document.getElementById('all-results');
+            resultDiv.textContent = 'Running all tests...\n\n';
+            resultDiv.className = 'result';
+
+            const tests = [
+                { name: 'Jokes', fn: testJokes },
+                { name: 'Submissions', fn: testSubmissions },
+                { name: 'Submit Joke', fn: testSubmitJoke },
+                { name: 'Rate Joke', fn: testRateJoke }
+            ];
+
+            let allPassed = true;
+            for (const test of tests) {
+                try {
+                    await test.fn();
+                    resultDiv.textContent += `✅ ${test.name}: PASSED\n`;
+                } catch (error) {
+                    resultDiv.textContent += `❌ ${test.name}: FAILED - ${error.message}\n`;
+                    allPassed = false;
+                }
+            }
+
+            resultDiv.textContent += `\n${allPassed ? '🎉 All tests passed!' : '⚠️ Some tests failed'}`;
+            resultDiv.className = allPassed ? 'result success' : 'result error';
+        }
+
+        // Auto-run tests on page load
+        window.onload = () => {
+            runAllTests();
+        };
+    </script>
+</body>
+</html>
