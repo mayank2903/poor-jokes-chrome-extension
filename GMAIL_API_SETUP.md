@@ -141,4 +141,4 @@ If you prefer not to use email:
 2. **Check periodically** - Review submissions when convenient
 3. **No notifications** - Less complexity
 
-The Gmail API system is more secure and reliable than SMTP! 🎉
+The Gmail API system is secure and reliable! 🎉

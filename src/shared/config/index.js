@@ -68,7 +68,7 @@ class ConfigManager {
       
       // Feature flags
       features: {
-        emailNotifications: !!(process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET),
+        gmailNotifications: !!(process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET),
         adminDashboard: true,
         jokeSubmission: true,
         ratingSystem: true

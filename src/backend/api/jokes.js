@@ -144,9 +144,9 @@ async function handleSubmitJoke(req, res) {
  */
 async function sendSubmissionNotification(submission) {
   try {
-    // Try email notification
+    // Try Gmail API notification
     if (process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET) {
-      await sendEmailNotification(submission);
+      await sendGmailNotification(submission);
     }
   } catch (error) {
     console.error('Notification error:', error);
@@ -155,13 +155,13 @@ async function sendSubmissionNotification(submission) {
 }
 
 /**
- * Send email notification
+ * Send Gmail notification
  * @param {Object} submission - Submission object
  */
-async function sendEmailNotification(submission) {
-  // This would integrate with the email service
+async function sendGmailNotification(submission) {
+  // This would integrate with the Gmail API service
   // For now, just log the submission
-  console.log('Email notification would be sent for submission:', submission.id);
+  console.log('Gmail notification would be sent for submission:', submission.id);
 }
 
 module.exports = handler;
