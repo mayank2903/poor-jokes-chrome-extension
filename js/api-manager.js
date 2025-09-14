@@ -17,7 +17,12 @@ class APIManager {
       return this.config.getBaseURL();
     }
     
-    return this.fallbackUrls[this.currentUrlIndex] || this.config.getBaseURL();
+    // Check if fallbackUrls exists and has items
+    if (this.fallbackUrls && this.fallbackUrls.length > 0 && this.currentUrlIndex < this.fallbackUrls.length) {
+      return this.fallbackUrls[this.currentUrlIndex];
+    }
+    
+    return this.config.getBaseURL();
   }
 
   // Health check for API endpoint
@@ -60,6 +65,13 @@ class APIManager {
   // Find the best working API URL
   async findBestAPI() {
     console.log('🔍 Finding best API endpoint...');
+    
+    // Check if fallbackUrls exists
+    if (!this.fallbackUrls || this.fallbackUrls.length === 0) {
+      console.log('⚠️ No fallback URLs configured, using default');
+      this.isHealthy = true;
+      return this.config.getBaseURL();
+    }
     
     const healthChecks = await Promise.allSettled(
       this.fallbackUrls.map(url => this.checkHealth(url))
@@ -139,8 +151,8 @@ class APIManager {
     } catch (error) {
       console.error(`❌ API Error: ${options.method || 'GET'} ${fullUrl} - ${error.message}`);
       
-      // If this is not the first URL, try the next one
-      if (this.currentUrlIndex < this.fallbackUrls.length - 1) {
+      // If this is not the last URL, try the next one
+      if (this.fallbackUrls && this.currentUrlIndex < this.fallbackUrls.length - 1) {
         console.log('🔄 Trying next API endpoint...');
         this.currentUrlIndex++;
         return this.request(endpoint, options);
@@ -158,7 +170,7 @@ class APIManager {
       lastHealthCheck: this.lastHealthCheck,
       environment: this.config.currentEnv,
       version: this.config.getVersion(),
-      availableUrls: this.fallbackUrls
+      availableUrls: this.fallbackUrls || []
     };
   }
 }

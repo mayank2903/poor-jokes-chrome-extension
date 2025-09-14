@@ -10,11 +10,18 @@ class APIConfig {
         cacheBust: true
       },
       production: {
-        baseUrl: 'https://poor-jokes-newtab-kcr9acwtg-mayanks-projects-72f678fa.vercel.app/api',
+        baseUrl: 'https://poor-jokes-newtab-ch7te6lzr-mayanks-projects-72f678fa.vercel.app/api',
         version: '1.0.0',
         cacheBust: false
       }
     };
+    
+    // Fallback URLs for API failover
+    this.FALLBACK_URLS = [
+      'https://poor-jokes-newtab-ch7te6lzr-mayanks-projects-72f678fa.vercel.app/api',
+      'https://poor-jokes-newtab-6yax4u0s4-mayanks-projects-72f678fa.vercel.app/api',
+      'https://poor-jokes-newtab-kcr9acwtg-mayanks-projects-72f678fa.vercel.app/api'
+    ];
     
     this.currentEnv = this.detectEnvironment();
     this.config = this.environments[this.currentEnv];
@@ -117,4 +124,20 @@ window.DEPLOYMENT_INFO = {
   version: '1.0.0',
   timestamp: '2025-09-14T19:43:43.464Z',
   deploymentId: 'deploy_1757879023465_fb5e00uwu'
+};
+
+
+// Deployment Info
+window.DEPLOYMENT_INFO = {
+  version: '1.0.0',
+  timestamp: '2025-09-14T19:46:48.528Z',
+  deploymentId: 'deploy_1757879208528_fk9gglmid'
+};
+
+
+// Deployment Info
+window.DEPLOYMENT_INFO = {
+  version: '1.0.0',
+  timestamp: '2025-09-14T19:48:20.213Z',
+  deploymentId: 'deploy_1757879300214_ywr2gglqr'
 };
