@@ -68,7 +68,6 @@ class ConfigManager {
       
       // Feature flags
       features: {
-        notifications: !!process.env.DISCORD_WEBHOOK_URL,
         emailNotifications: !!(process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET),
         adminDashboard: true,
         jokeSubmission: true,

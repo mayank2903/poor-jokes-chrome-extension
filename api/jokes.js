@@ -129,7 +129,7 @@ async function submitJoke(req, res) {
 
     logAPISuccess('POST /api/jokes', 'submit_joke', { submission_id: data.id });
     
-    // Send Discord notification for new submission
+    // Send notification for new submission
     await sendSubmissionNotification(data);
     
     return res.status(201).json({

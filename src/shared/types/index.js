@@ -56,7 +56,6 @@
 
 /**
  * @typedef {Object} NotificationConfig
- * @property {string} [discordWebhookUrl] - Discord webhook URL
  * @property {string} [gmailClientId] - Gmail API client ID
  * @property {string} [gmailClientSecret] - Gmail API client secret
  * @property {string} [gmailRefreshToken] - Gmail API refresh token

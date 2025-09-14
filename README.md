@@ -66,7 +66,6 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ADMIN_PASSWORD=your_admin_password
-DISCORD_WEBHOOK_URL=your_discord_webhook (optional)
 GMAIL_CLIENT_ID=your_gmail_client_id (optional)
 GMAIL_CLIENT_SECRET=your_gmail_client_secret (optional)
 ```
@@ -254,7 +253,6 @@ Get joke submissions (admin only).
 | `SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes |
 | `ADMIN_PASSWORD` | Admin dashboard password | Yes |
-| `DISCORD_WEBHOOK_URL` | Discord webhook for notifications | No |
 | `GMAIL_CLIENT_ID` | Gmail API client ID | No |
 | `GMAIL_CLIENT_SECRET` | Gmail API client secret | No |
 
@@ -264,7 +262,6 @@ The application supports feature flags in the configuration:
 
 ```javascript
 features: {
-  notifications: true,        // Discord notifications
   emailNotifications: false,  // Email notifications
   adminDashboard: true,       // Admin dashboard
   jokeSubmission: true,       // Joke submission

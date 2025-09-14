@@ -144,11 +144,6 @@ async function handleSubmitJoke(req, res) {
  */
 async function sendSubmissionNotification(submission) {
   try {
-    // Try Discord notification first
-    if (process.env.DISCORD_WEBHOOK_URL) {
-      await sendDiscordNotification(submission);
-    }
-    
     // Try email notification
     if (process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET) {
       await sendEmailNotification(submission);
@@ -156,59 +151,6 @@ async function sendSubmissionNotification(submission) {
   } catch (error) {
     console.error('Notification error:', error);
     // Don't fail the request if notifications fail
-  }
-}
-
-/**
- * Send Discord notification
- * @param {Object} submission - Submission object
- */
-async function sendDiscordNotification(submission) {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-  if (!webhookUrl) return;
-
-  const embed = {
-    title: "🎭 New Joke Submission",
-    description: `**Joke ID:** ${submission.id}\n**Content:** ${submission.content}`,
-    color: 0xffc107,
-    fields: [
-      {
-        name: "📅 Submitted",
-        value: new Date(submission.created_at).toLocaleString(),
-        inline: true
-      },
-      {
-        name: "👤 Submitted By",
-        value: submission.submitted_by || "Anonymous",
-        inline: true
-      },
-      {
-        name: "📊 Status",
-        value: "⏳ Pending Review",
-        inline: true
-      }
-    ],
-    footer: {
-      text: "Poor Jokes Chrome Extension"
-    },
-    timestamp: new Date().toISOString()
-  };
-
-  const payload = {
-    username: "Joke Moderator",
-    embeds: [embed]
-  };
-
-  const response = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    throw new Error(`Discord notification failed: ${response.status}`);
   }
 }
 
