@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const { validateRequest, logAPIError, logAPISuccess } = require('./validation');
-const { sendSubmissionNotification } = require('./gmail-notifications');
+const { sendSubmissionNotification } = require('../lib/gmail-notifications');
 
 // Initialize Supabase clients
 const supabase = createClient(

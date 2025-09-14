@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poor Jokes New Tab</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="description" content="Transform your new tab into a laughter-filled experience with poor jokes, ratings, and community submissions!">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h2>Loading Poor Jokes...</h2>
+            <p>Preparing your daily dose of laughter</p>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app" class="app-container hidden">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    <span class="title-icon">🎭</span>
+                    Poor Jokes New Tab
+                </h1>
+                <p class="app-subtitle">Bringing laughter to every new tab</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Joke Display Area -->
+            <section class="joke-section">
+                <div class="joke-container">
+                    <div class="joke-card-container">
+                        <!-- Joke cards will be dynamically inserted here -->
+                    </div>
+                    
+                    <!-- Loading State -->
+                    <div class="loading-state hidden">
+                        <div class="loading-spinner"></div>
+                        <p>Loading a fresh joke...</p>
+                    </div>
+                    
+                    <!-- Error State -->
+                    <div class="error-state hidden">
+                        <div class="error-icon">😅</div>
+                        <h3>Oops! No jokes available</h3>
+                        <p>We're having trouble loading jokes right now.</p>
+                        <button class="retry-btn">Try Again</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Controls -->
+            <section class="controls-section">
+                <div class="controls-container">
+                    <button class="control-btn primary" id="new-joke-btn">
+                        <span class="btn-icon">🎲</span>
+                        New Joke
+                    </button>
+                    <button class="control-btn secondary" id="submit-joke-btn">
+                        <span class="btn-icon">📝</span>
+                        Submit Joke
+                    </button>
+                    <button class="control-btn secondary" id="admin-btn">
+                        <span class="btn-icon">⚙️</span>
+                        Admin
+                    </button>
+                </div>
+            </section>
+
+            <!-- Submission Form -->
+            <section class="submission-section hidden" id="submission-section">
+                <div class="submission-container">
+                    <div class="submission-header">
+                        <h3>Submit Your Poor Joke</h3>
+                        <button class="close-btn" id="close-submission-btn">×</button>
+                    </div>
+                    <form class="submission-form" id="joke-submission-form">
+                        <div class="form-group">
+                            <label for="joke-content">Your Joke:</label>
+                            <textarea 
+                                id="joke-content" 
+                                class="form-textarea" 
+                                placeholder="Enter your poor joke here..."
+                                maxlength="500"
+                                required
+                            ></textarea>
+                            <div class="character-count">
+                                <span class="current-count">0</span> / 500
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="submitter-name">Your Name (optional):</label>
+                            <input 
+                                type="text" 
+                                id="submitter-name" 
+                                class="form-input" 
+                                placeholder="Anonymous"
+                            />
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="form-btn primary">
+                                Submit Joke
+                            </button>
+                            <button type="button" class="form-btn secondary" id="cancel-submission-btn">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <p>&copy; 2024 Poor Jokes Team. Made with 😂 and poor jokes.</p>
+                </div>
+                <div class="footer-links">
+                    <a href="#" class="footer-link" id="privacy-link">Privacy Policy</a>
+                    <a href="#" class="footer-link" id="admin-link">Admin Dashboard</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/api-client.js"></script>
+    <script src="js/joke-service.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

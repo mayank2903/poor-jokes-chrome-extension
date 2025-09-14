@@ -109,22 +109,40 @@ class DeploymentManager {
     console.log('🏥 Running health checks...');
     
     const apiUrl = `${deploymentUrl}/api`;
-    const endpoints = ['/jokes', '/submissions?status=pending'];
+    const adminPassword = process.env.ADMIN_PASSWORD || 'PoorJokes2024!Admin';
     
-    for (const endpoint of endpoints) {
-      try {
-        const response = await fetch(`${apiUrl}${endpoint}`);
-        const data = await response.json();
-        
-        if (response.ok && data.success) {
-          console.log(`✅ Health check passed: ${endpoint}`);
-        } else {
-          throw new Error(`Health check failed: ${endpoint}`);
-        }
-      } catch (error) {
-        console.error(`❌ Health check failed: ${endpoint} - ${error.message}`);
-        throw error;
+    // Test jokes endpoint (public)
+    try {
+      const response = await fetch(`${apiUrl}/jokes`);
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log(`✅ Health check passed: /jokes`);
+      } else {
+        throw new Error(`Health check failed: /jokes`);
       }
+    } catch (error) {
+      console.error(`❌ Health check failed: /jokes - ${error.message}`);
+      throw error;
+    }
+    
+    // Test submissions endpoint (requires admin auth)
+    try {
+      const response = await fetch(`${apiUrl}/submissions?status=pending`, {
+        headers: {
+          'x-admin-password': adminPassword
+        }
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log(`✅ Health check passed: /submissions`);
+      } else {
+        throw new Error(`Health check failed: /submissions`);
+      }
+    } catch (error) {
+      console.error(`❌ Health check failed: /submissions - ${error.message}`);
+      throw error;
     }
     
     console.log('✅ All health checks passed');

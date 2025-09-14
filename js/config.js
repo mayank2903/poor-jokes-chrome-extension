@@ -10,7 +10,7 @@ class APIConfig {
         cacheBust: true
       },
       production: {
-        baseUrl: 'https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app/api',
+        baseUrl: 'https://poor-jokes-newtab-4r0gcrtx0-mayanks-projects-72f678fa.vercel.app/api',
         version: '1.0.0',
         cacheBust: false
       }
@@ -72,10 +72,25 @@ window.APIConfig = new APIConfig();
 // Log configuration for debugging
 console.log('🔧 API Configuration:', window.APIConfig.getInfo());
 
+// Deployment Info
+window.DEPLOYMENT_INFO = {
+  version: '1.0.0',
+  timestamp: '2025-09-14T19:07:52.928Z',
+  deploymentId: 'deploy_1757876872928_64ygo6y9k'
+};
+
 
 // Deployment Info
 window.DEPLOYMENT_INFO = {
   version: '1.0.0',
-  timestamp: '2025-09-14T16:31:54.501Z',
-  deploymentId: 'deploy_1757867514502_ie3eccv6u'
+  timestamp: '2025-09-14T19:09:42.903Z',
+  deploymentId: 'deploy_1757876982903_4gwo1dtay'
+};
+
+
+// Deployment Info
+window.DEPLOYMENT_INFO = {
+  version: '1.0.0',
+  timestamp: '2025-09-14T19:11:15.885Z',
+  deploymentId: 'deploy_1757877075886_qi6ayhj9n'
 };
