@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const { validateRequest, logAPIError, logAPISuccess } = require('./validation');
+const { sendApprovalNotification, sendRejectionNotification } = require('./gmail-notifications');
 
 // Initialize Supabase client with service role key for admin operations
 const supabase = createClient(
@@ -134,6 +135,9 @@ async function reviewSubmission(req, res) {
         throw updateError;
       }
 
+      // Send approval notification
+      await sendApprovalNotification(submission);
+
       return res.status(200).json({
         success: true,
         message: 'Joke approved and added to the collection',
@@ -154,6 +158,9 @@ async function reviewSubmission(req, res) {
       if (updateError) {
         throw updateError;
       }
+
+      // Send rejection notification
+      await sendRejectionNotification(submission, rejection_reason);
 
       return res.status(200).json({
         success: true,

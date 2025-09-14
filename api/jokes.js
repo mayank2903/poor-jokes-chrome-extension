@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const { validateRequest, logAPIError, logAPISuccess } = require('./validation');
+const { sendSubmissionNotification } = require('./gmail-notifications');
 
 // Initialize Supabase clients
 const supabase = createClient(
@@ -127,6 +128,10 @@ async function submitJoke(req, res) {
     }
 
     logAPISuccess('POST /api/jokes', 'submit_joke', { submission_id: data.id });
+    
+    // Send Discord notification for new submission
+    await sendSubmissionNotification(data);
+    
     return res.status(201).json({
       success: true,
       message: 'Joke submitted successfully! It will be reviewed before being added.',
