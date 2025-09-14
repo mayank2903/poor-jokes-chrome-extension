@@ -42,6 +42,7 @@ body {
 /* Submission section styling */
 .submission-section {
   margin-bottom: 2rem;
+  text-align: center;
 }
 
 .submit-btn {

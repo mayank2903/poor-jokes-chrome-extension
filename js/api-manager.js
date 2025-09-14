@@ -6,9 +6,9 @@ class APIManager {
     this.config = window.APIConfig;
     this.healthCheckInterval = null;
     this.fallbackUrls = [
-      'https://poor-jokes-newtab-7huqmp0n7-mayanks-projects-72f678fa.vercel.app/api',
-      'https://poor-jokes-newtab-iiywwqjlo-mayanks-projects-72f678fa.vercel.app/api',
-      'https://poor-jokes-newtab-jlztum8rw-mayanks-projects-72f678fa.vercel.app/api'
+      'https://poor-jokes-newtab-hos0vxjqo-mayanks-projects-72f678fa.vercel.app/api', // Latest
+      'https://poor-jokes-newtab-gxuszllsh-mayanks-projects-72f678fa.vercel.app/api',
+      'https://poor-jokes-newtab-lj2vvose4-mayanks-projects-72f678fa.vercel.app/api'
     ];
     this.currentUrlIndex = 0;
     this.isHealthy = true;

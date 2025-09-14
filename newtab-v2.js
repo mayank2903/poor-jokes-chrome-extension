@@ -118,7 +118,7 @@ async function updateCurrentJokeRatings() {
   }
 }
 
-// Rate a joke
+// Rate a joke with optimistic UI updates
 async function rateJoke(rating) {
   if (!currentJoke) {
     console.log('No current joke to rate');
@@ -135,6 +135,51 @@ async function rateJoke(rating) {
     previousRating: previousRating
   });
   
+  // OPTIMISTIC UPDATE: Update UI immediately
+  const wasRated = previousRating !== undefined;
+  const isSameRating = previousRating === ratingValue;
+  
+  if (isSameRating) {
+    // User clicked the same rating - remove it
+    delete userRatings[currentJoke.id];
+    // Update vote counts optimistically
+    if (ratingValue === 1) {
+      currentJoke.up_votes = Math.max(0, currentJoke.up_votes - 1);
+    } else {
+      currentJoke.down_votes = Math.max(0, currentJoke.down_votes - 1);
+    }
+  } else {
+    // User clicked different rating or new rating
+    if (wasRated) {
+      // Switching from one rating to another
+      if (previousRating === 1) {
+        currentJoke.up_votes = Math.max(0, currentJoke.up_votes - 1);
+      } else {
+        currentJoke.down_votes = Math.max(0, currentJoke.down_votes - 1);
+      }
+    }
+    
+    // Add new rating
+    userRatings[currentJoke.id] = ratingValue;
+    if (ratingValue === 1) {
+      currentJoke.up_votes += 1;
+    } else {
+      currentJoke.down_votes += 1;
+    }
+  }
+  
+  // Update total votes and percentage
+  currentJoke.total_votes = currentJoke.up_votes + currentJoke.down_votes;
+  currentJoke.rating_percentage = currentJoke.total_votes > 0 ? 
+    Math.round((currentJoke.up_votes / currentJoke.total_votes) * 100) : 0;
+  
+  // Update UI immediately
+  updateRatingDisplay();
+  
+  // Save to localStorage immediately
+  localStorage.setItem('userRatings', JSON.stringify(userRatings));
+  
+  // Now sync with server in background
   try {
     const data = await window.APIManager.request('/rate', {
       method: 'POST',
@@ -148,31 +193,16 @@ async function rateJoke(rating) {
     console.log('Rating API response:', data);
     
     if (data.success) {
-      // Update local user ratings
-      if (data.action === 'removed') {
-        delete userRatings[currentJoke.id];
-      } else {
-        userRatings[currentJoke.id] = ratingValue;
-      }
-      
-      // Save to localStorage
-      localStorage.setItem('userRatings', JSON.stringify(userRatings));
-      
-      // Update the current joke's rating display without changing the joke
+      // Server confirmed the rating - update with server data
       await updateCurrentJokeRatings();
     } else {
       console.error('Failed to rate joke:', data.error);
+      // Could show a subtle error message here if needed
     }
   } catch (error) {
     console.error('Error rating joke:', error);
-    // Fallback to local rating for offline mode
-    if (previousRating === ratingValue) {
-      delete userRatings[currentJoke.id];
-    } else {
-      userRatings[currentJoke.id] = ratingValue;
-    }
-    localStorage.setItem('userRatings', JSON.stringify(userRatings));
-    updateRatingDisplay();
+    // Rating was already updated optimistically, so user sees immediate feedback
+    // Could show a subtle "offline" indicator if needed
   }
 }
 
@@ -186,7 +216,7 @@ function showSubmissionForm() {
 // Hide submission form
 function hideSubmissionForm() {
   submissionForm.style.display = 'none';
-  submitJokeBtn.style.display = 'block';
+  submitJokeBtn.style.display = 'inline-block';
   jokeTextarea.value = '';
   submissionStatus.textContent = '';
 }
