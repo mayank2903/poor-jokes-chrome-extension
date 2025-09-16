@@ -5,6 +5,7 @@
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const { answerCallbackQuery, editMessage } = require('../lib/telegram-notifications');
+const { formatJokeContent, formatSubmitterName, validateJokeQuality } = require('../lib/joke-formatter');
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -127,11 +128,22 @@ async function handleCallbackQuery(callbackQuery) {
  */
 async function handleApproveSubmission(submissionId, submission, callbackId, chatId, messageId) {
   try {
-    // Add joke to main jokes table
+    // Format the joke content before adding to main table
+    const contentResult = formatJokeContent(submission.content);
+    
+    if (!contentResult.isValid) {
+      await answerCallbackQuery(callbackId, 'Cannot approve joke with invalid content', true);
+      return;
+    }
+
+    // Validate joke quality
+    const qualityCheck = validateJokeQuality(contentResult.formatted);
+    
+    // Add joke to main jokes table with formatted content
     const { data: newJoke, error: insertError } = await supabase
       .from('jokes')
       .insert([{
-        content: submission.content
+        content: contentResult.formatted
       }])
       .select()
       .single();

@@ -2,6 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const { validateRequest, logAPIError, logAPISuccess } = require('./validation');
 const { sendApprovalNotification, sendRejectionNotification } = require('../lib/telegram-notifications');
+const { formatJokeContent, formatSubmitterName, validateJokeQuality } = require('../lib/joke-formatter');
 
 // Initialize Supabase client with service role key for admin operations
 const supabase = createClient(
@@ -106,12 +107,25 @@ async function reviewSubmission(req, res) {
     }
 
     if (action === 'approve') {
-      // Add the joke to the main jokes table
+      // Format the joke content before adding to main table
+      const contentResult = formatJokeContent(submission.content);
+      
+      if (!contentResult.isValid) {
+        return res.status(400).json({
+          error: 'Cannot approve joke with invalid content',
+          details: contentResult.errors
+        });
+      }
+
+      // Validate joke quality
+      const qualityCheck = validateJokeQuality(contentResult.formatted);
+      
+      // Add the joke to the main jokes table with formatted content
       const { data: newJoke, error: insertError } = await supabase
         .from('jokes')
         .insert([
           {
-            content: submission.content
+            content: contentResult.formatted
           }
         ])
         .select()

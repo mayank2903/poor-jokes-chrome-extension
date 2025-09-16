@@ -2,6 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const { validateRequest, logAPIError, logAPISuccess } = require('./validation');
 const { sendSubmissionNotification } = require('../lib/telegram-notifications');
+const { formatJokeContent, formatSubmitterName, validateJokeQuality } = require('../lib/joke-formatter');
 
 // Initialize Supabase clients
 const supabase = createClient(
@@ -104,20 +105,36 @@ async function submitJoke(req, res) {
   try {
     const { content, submitted_by } = req.body;
 
-    if (!content || content.trim().length === 0) {
-      return res.status(400).json({ error: 'Joke content is required' });
+    // Format and validate joke content
+    const contentResult = formatJokeContent(content);
+    
+    if (!contentResult.isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid joke content',
+        details: contentResult.errors,
+        formatted: contentResult.formatted
+      });
     }
 
-    if (content.length > 500) {
-      return res.status(400).json({ error: 'Joke content is too long (max 500 characters)' });
-    }
+    // Format submitter name
+    const formattedSubmitter = formatSubmitterName(submitted_by);
+
+    // Validate joke quality
+    const qualityCheck = validateJokeQuality(contentResult.formatted);
+    
+    // Log quality metrics for monitoring
+    console.log('Joke quality check:', {
+      score: qualityCheck.percentage,
+      isHighQuality: qualityCheck.isHighQuality,
+      checks: qualityCheck
+    });
 
     const { data, error } = await supabaseAdmin
       .from('joke_submissions')
       .insert([
         {
-          content: content.trim(),
-          submitted_by: submitted_by || 'anonymous'
+          content: contentResult.formatted,
+          submitted_by: formattedSubmitter
         }
       ])
       .select()
@@ -127,7 +144,11 @@ async function submitJoke(req, res) {
       throw error;
     }
 
-    logAPISuccess('POST /api/jokes', 'submit_joke', { submission_id: data.id });
+    logAPISuccess('POST /api/jokes', 'submit_joke', { 
+      submission_id: data.id,
+      quality_score: qualityCheck.percentage,
+      word_count: contentResult.wordCount
+    });
     
     // Send notification for new submission
     await sendSubmissionNotification(data);
@@ -135,7 +156,9 @@ async function submitJoke(req, res) {
     return res.status(201).json({
       success: true,
       message: 'Joke submitted successfully! It will be reviewed before being added.',
-      submission_id: data.id
+      submission_id: data.id,
+      quality_score: qualityCheck.percentage,
+      formatted_content: contentResult.formatted
     });
   } catch (error) {
     logAPIError('POST /api/jokes', error, req.body);

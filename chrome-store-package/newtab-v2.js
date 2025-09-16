@@ -27,20 +27,10 @@ function generateUserId() {
   return 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 }
 
-// Load jokes from API using APIManager
+// Load jokes from API using APIManager with immediate fallback
 async function loadJokes() {
-  try {
-    const data = await window.APIManager.request('/jokes');
-    
-    if (data.success) {
-      allJokes = data.jokes;
-      showRandomJoke();
-    } else {
-      throw new Error('Failed to load jokes');
-    }
-  } catch (error) {
-    console.error('Error loading jokes:', error);
-    // Fallback to local jokes
+  // Show local joke immediately for better UX
+  if (POOR_JOKES && POOR_JOKES.length > 0) {
     allJokes = POOR_JOKES.map((content, index) => ({
       id: `local_${index}`,
       content: content,
@@ -50,6 +40,21 @@ async function loadJokes() {
       rating_percentage: 0
     }));
     showRandomJoke();
+    console.log('✅ Loaded local jokes immediately');
+  }
+  
+  // Then try to load from API in background
+  try {
+    const data = await window.APIManager.request('/jokes');
+    
+    if (data.success && data.jokes && data.jokes.length > 0) {
+      allJokes = data.jokes;
+      // Don't automatically change the joke - just update the available jokes
+      console.log('✅ Loaded jokes from API (background)');
+    }
+  } catch (error) {
+    console.error('Error loading jokes from API:', error);
+    // Keep using local jokes as fallback
   }
 }
 
@@ -236,13 +241,8 @@ submitJoke.addEventListener('click', submitJokeToAPI);
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  // Wait for APIManager to be ready
-  if (window.APIManager) {
-    loadJokes();
-  } else {
-    // Fallback if APIManager isn't loaded yet
-    setTimeout(loadJokes, 1000);
-  }
+  // Load jokes immediately - don't wait for APIManager
+  loadJokes();
 });
 
 // Save user ID

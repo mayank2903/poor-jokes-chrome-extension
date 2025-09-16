@@ -25,7 +25,7 @@ class APIManager {
     return this.config.getBaseURL();
   }
 
-  // Health check for API endpoint
+  // Health check for API endpoint with faster timeout
   async checkHealth(url = null) {
     const testUrl = url || this.getCurrentURL();
     const healthEndpoint = `${testUrl}/jokes`;
@@ -36,8 +36,8 @@ class APIManager {
         headers: {
           'Content-Type': 'application/json'
         },
-        // Add timeout
-        signal: AbortSignal.timeout(5000)
+        // Reduced timeout for faster response
+        signal: AbortSignal.timeout(2000)
       });
       
       const data = await response.json();

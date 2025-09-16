@@ -6,10 +6,7 @@
   "short_name": "Joor Pokes",
   "author": "Poor Jokes Team",
   "homepage_url": "https://poor-jokes-newtab-7huqmp0n7-mayanks-projects-72f678fa.vercel.app",
-  "privacy_policy": "https://poor-jokes-newtab-7huqmp0n7-mayanks-projects-72f678fa.vercel.app/privacy-policy.html",
-  "permissions": [
-    "storage"
-  ],
+  "permissions": [],
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
