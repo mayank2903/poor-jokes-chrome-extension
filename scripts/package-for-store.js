@@ -85,26 +85,27 @@ class StorePackager {
     const iconsDir = path.join(this.packageDir, 'icons');
     fs.mkdirSync(iconsDir, { recursive: true });
     
-    // Check if icons already exist
+    // Copy real icons from main project
     const iconSizes = [16, 32, 48, 128];
-    let existingIcons = 0;
+    let copiedIcons = 0;
     
     iconSizes.forEach(size => {
-      const iconPath = path.join(iconsDir, `icon${size}.png`);
-      if (fs.existsSync(iconPath) && fs.statSync(iconPath).size > 0) {
-        existingIcons++;
-        console.log(`✅ Found existing icon${size}.png`);
+      const sourceIconPath = path.join('icons', `icon${size}.png`);
+      const destIconPath = path.join(iconsDir, `icon${size}.png`);
+      
+      if (fs.existsSync(sourceIconPath) && fs.statSync(sourceIconPath).size > 0) {
+        fs.copyFileSync(sourceIconPath, destIconPath);
+        copiedIcons++;
+        console.log(`✅ Copied icon${size}.png`);
       } else {
-        // Create a simple placeholder only if no icon exists
-        fs.writeFileSync(iconPath, '');
-        console.log(`📄 Created placeholder icon${size}.png`);
+        console.warn(`⚠️  Icon not found: ${sourceIconPath}`);
       }
     });
     
-    if (existingIcons === iconSizes.length) {
-      console.log('🎉 All icons are ready!');
+    if (copiedIcons === iconSizes.length) {
+      console.log('🎉 All icons copied successfully!');
     } else {
-      console.log('⚠️  Some icons are missing - replace placeholders with real ones!');
+      console.log(`⚠️  Only ${copiedIcons}/${iconSizes.length} icons were copied`);
     }
   }
 

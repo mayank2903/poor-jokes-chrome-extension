@@ -5,9 +5,7 @@ class APIManager {
   constructor() {
     this.config = window.APIConfig;
     this.healthCheckInterval = null;
-    this.fallbackUrls = [
-      'https://poor-jokes-newtab.vercel.app/api' // Only use stable production URL
-    ];
+    this.fallbackUrls = this.config.FALLBACK_URLS;
     this.currentUrlIndex = 0;
     this.isHealthy = true;
     this.lastHealthCheck = null;
@@ -19,11 +17,15 @@ class APIManager {
       return this.config.getBaseURL();
     }
     
-    // Always use the stable production URL
-    return 'https://poor-jokes-newtab.vercel.app/api';
+    // Check if fallbackUrls exists and has items
+    if (this.fallbackUrls && this.fallbackUrls.length > 0 && this.currentUrlIndex < this.fallbackUrls.length) {
+      return this.fallbackUrls[this.currentUrlIndex];
+    }
+    
+    return this.config.getBaseURL();
   }
 
-  // Health check for API endpoint
+  // Health check for API endpoint with faster timeout
   async checkHealth(url = null) {
     const testUrl = url || this.getCurrentURL();
     const healthEndpoint = `${testUrl}/jokes`;
@@ -34,8 +36,8 @@ class APIManager {
         headers: {
           'Content-Type': 'application/json'
         },
-        // Add timeout
-        signal: AbortSignal.timeout(5000)
+        // Reduced timeout for faster response
+        signal: AbortSignal.timeout(2000)
       });
       
       const data = await response.json();
@@ -63,6 +65,13 @@ class APIManager {
   // Find the best working API URL
   async findBestAPI() {
     console.log('🔍 Finding best API endpoint...');
+    
+    // Check if fallbackUrls exists
+    if (!this.fallbackUrls || this.fallbackUrls.length === 0) {
+      console.log('⚠️ No fallback URLs configured, using default');
+      this.isHealthy = true;
+      return this.config.getBaseURL();
+    }
     
     const healthChecks = await Promise.allSettled(
       this.fallbackUrls.map(url => this.checkHealth(url))
@@ -114,7 +123,7 @@ class APIManager {
     }
   }
 
-  // Make API request to stable production URL
+  // Make API request with automatic fallback
   async request(endpoint, options = {}) {
     const url = this.getCurrentURL();
     const fullUrl = `${url}${endpoint}`;
@@ -141,6 +150,14 @@ class APIManager {
       
     } catch (error) {
       console.error(`❌ API Error: ${options.method || 'GET'} ${fullUrl} - ${error.message}`);
+      
+      // If this is not the last URL, try the next one
+      if (this.fallbackUrls && this.currentUrlIndex < this.fallbackUrls.length - 1) {
+        console.log('🔄 Trying next API endpoint...');
+        this.currentUrlIndex++;
+        return this.request(endpoint, options);
+      }
+      
       throw error;
     }
   }
@@ -153,7 +170,7 @@ class APIManager {
       lastHealthCheck: this.lastHealthCheck,
       environment: this.config.currentEnv,
       version: this.config.getVersion(),
-      availableUrls: this.fallbackUrls
+      availableUrls: this.fallbackUrls || []
     };
   }
 }

@@ -5,7 +5,6 @@
 const jokeEl = document.getElementById('joke');
 const nextJokeBtn = document.getElementById('another');
 const copyBtn = document.getElementById('copy');
-const refreshBtn = document.getElementById('refresh');
 const thumbsUpBtn = document.getElementById('thumbs-up');
 const thumbsDownBtn = document.getElementById('thumbs-down');
 const upCountEl = document.getElementById('up-count');
@@ -24,236 +23,16 @@ let allJokes = [];
 let userRatings = JSON.parse(localStorage.getItem('userRatings') || '{}');
 let userId = localStorage.getItem('userId') || generateUserId();
 
-// Cache configuration
-const CACHE_CONFIG = {
-  JOKES_KEY: 'poorJokes_cache',
-  LAST_FETCH_KEY: 'poorJokes_lastFetch',
-  REFRESH_INTERVAL: 300000, // 5 minutes in milliseconds (reduced from 1 hour)
-  MAX_CACHE_AGE: 1800000 // 30 minutes max cache age (reduced from 24 hours)
-};
-
-// Display history configuration
-const DISPLAY_CONFIG = {
-  HISTORY_KEY: 'poorJokes_displayHistory',
-  MAX_HISTORY_SIZE: 20, // Keep track of last 20 shown jokes
-  UNSEEN_WEIGHT: 10,    // Weight for jokes not shown recently
-  RECENT_WEIGHT: 1,     // Weight for recently shown jokes
-  RESET_THRESHOLD: 0.8  // Reset history when 80% of jokes have been shown
-};
-
 // Generate unique user ID
 function generateUserId() {
   return 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 }
 
-// Cache management functions
-function getCachedJokes() {
-  try {
-    const cached = localStorage.getItem(CACHE_CONFIG.JOKES_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      // Validate cache structure
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (error) {
-    console.warn('Error reading cached jokes:', error);
-  }
-  return [];
-}
-
-function cacheJokes(jokes) {
-  try {
-    localStorage.setItem(CACHE_CONFIG.JOKES_KEY, JSON.stringify(jokes));
-    setLastFetchTime();
-    console.log('✅ Cached jokes:', jokes.length);
-  } catch (error) {
-    console.warn('Error caching jokes:', error);
-  }
-}
-
-function getLastFetchTime() {
-  try {
-    const lastFetch = localStorage.getItem(CACHE_CONFIG.LAST_FETCH_KEY);
-    return lastFetch ? parseInt(lastFetch, 10) : null;
-  } catch (error) {
-    console.warn('Error reading last fetch time:', error);
-    return null;
-  }
-}
-
-function setLastFetchTime() {
-  try {
-    localStorage.setItem(CACHE_CONFIG.LAST_FETCH_KEY, Date.now().toString());
-  } catch (error) {
-    console.warn('Error setting last fetch time:', error);
-  }
-}
-
-function shouldRefreshJokes() {
-  const lastFetch = getLastFetchTime();
-  const now = Date.now();
-  
-  // Always refresh if:
-  // - Never fetched before
-  // - Cache is empty
-  // - Cache is too old (24 hours)
-  if (!lastFetch || allJokes.length === 0) {
-    return true;
-  }
-  
-  const timeSinceLastFetch = now - lastFetch;
-  const isTooOld = timeSinceLastFetch > CACHE_CONFIG.MAX_CACHE_AGE;
-  const shouldRefresh = timeSinceLastFetch > CACHE_CONFIG.REFRESH_INTERVAL;
-  
-  if (isTooOld) {
-    console.log('🔄 Cache too old, refreshing...');
-    return true;
-  }
-  
-  if (shouldRefresh) {
-    console.log('🔄 Cache refresh interval reached, refreshing...');
-    return true;
-  }
-  
-  console.log('✅ Using cached jokes (fresh)');
-  return false;
-}
-
-function clearJokeCache() {
-  try {
-    localStorage.removeItem(CACHE_CONFIG.JOKES_KEY);
-    localStorage.removeItem(CACHE_CONFIG.LAST_FETCH_KEY);
-    console.log('🗑️ Joke cache cleared');
-  } catch (error) {
-    console.warn('Error clearing joke cache:', error);
-  }
-}
-
-// Manual refresh function for users
-async function refreshJokes() {
-  console.log('🔄 Manual refresh requested...');
-  clearJokeCache();
-  clearDisplayHistory(); // Clear display history when refreshing
-  await loadJokes();
-}
-
-// Display history management functions
-function getDisplayHistory() {
-  try {
-    const history = localStorage.getItem(DISPLAY_CONFIG.HISTORY_KEY);
-    return history ? JSON.parse(history) : [];
-  } catch (error) {
-    console.warn('Error reading display history:', error);
-    return [];
-  }
-}
-
-function addToDisplayHistory(jokeId) {
-  try {
-    let history = getDisplayHistory();
-    
-    // Remove if already exists (to move to end)
-    history = history.filter(id => id !== jokeId);
-    
-    // Add to end
-    history.push(jokeId);
-    
-    // Keep only the last MAX_HISTORY_SIZE entries
-    if (history.length > DISPLAY_CONFIG.MAX_HISTORY_SIZE) {
-      history = history.slice(-DISPLAY_CONFIG.MAX_HISTORY_SIZE);
-    }
-    
-    localStorage.setItem(DISPLAY_CONFIG.HISTORY_KEY, JSON.stringify(history));
-    console.log('📝 Added to display history:', jokeId);
-  } catch (error) {
-    console.warn('Error updating display history:', error);
-  }
-}
-
-function shouldResetHistory() {
-  const history = getDisplayHistory();
-  const totalJokes = allJokes.length;
-  
-  if (totalJokes === 0) return false;
-  
-  const historyPercentage = history.length / totalJokes;
-  return historyPercentage >= DISPLAY_CONFIG.RESET_THRESHOLD;
-}
-
-function clearDisplayHistory() {
-  try {
-    localStorage.removeItem(DISPLAY_CONFIG.HISTORY_KEY);
-    console.log('🗑️ Display history cleared');
-  } catch (error) {
-    console.warn('Error clearing display history:', error);
-  }
-}
-
-function getWeightedJokeSelection() {
-  if (allJokes.length === 0) return null;
-  
-  const history = getDisplayHistory();
-  const unseenJokes = allJokes.filter(joke => !history.includes(joke.id));
-  
-  // If we have unseen jokes, prioritize them heavily
-  if (unseenJokes.length > 0) {
-    console.log(`🎯 Found ${unseenJokes.length} unseen jokes, prioritizing them`);
-    return unseenJokes[Math.floor(Math.random() * unseenJokes.length)];
-  }
-  
-  // If all jokes have been seen recently, use weighted selection
-  console.log('⚖️ All jokes seen recently, using weighted selection');
-  
-  const weights = allJokes.map(joke => {
-    const isRecent = history.includes(joke.id);
-    return isRecent ? DISPLAY_CONFIG.RECENT_WEIGHT : DISPLAY_CONFIG.UNSEEN_WEIGHT;
-  });
-  
-  // Weighted random selection
-  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-  let random = Math.random() * totalWeight;
-  
-  for (let i = 0; i < allJokes.length; i++) {
-    random -= weights[i];
-    if (random <= 0) {
-      return allJokes[i];
-    }
-  }
-  
-  // Fallback to random selection
-  return allJokes[Math.floor(Math.random() * allJokes.length)];
-}
-
-// Load jokes using smart caching strategy
+// Load jokes from API using APIManager with immediate fallback
 async function loadJokes() {
-  const loadStartTime = Date.now();
-  console.log('🔄 Loading jokes with smart caching...');
+  console.log('loadJokes() called');
   
-  // 1. Try to get a joke from smart cache first
-  try {
-    const joke = await window.SmartJokeCache.getRandomJoke();
-    if (joke) {
-      const loadEndTime = Date.now();
-      showJoke(joke);
-      window.PerformanceMonitor.trackJokeLoad(loadStartTime, loadEndTime, 'smart-cache');
-      window.PerformanceMonitor.trackCacheHit();
-      console.log('⚡ Loaded joke from smart cache');
-      
-      // Trigger background prefetch if needed
-      window.SmartJokeCache.smartPrefetch();
-      return;
-    } else {
-      console.warn('⚠️ Smart cache returned null, falling back to local jokes');
-    }
-  } catch (error) {
-    console.error('❌ Error getting joke from smart cache:', error);
-    window.PerformanceMonitor.trackError(error, 'smart-cache');
-    window.PerformanceMonitor.trackCacheMiss();
-  }
-  
-  // 2. Fallback to local jokes if smart cache fails
+  // Show local joke immediately for better UX
   if (POOR_JOKES && POOR_JOKES.length > 0) {
     allJokes = POOR_JOKES.map((content, index) => ({
       id: `local_${index}`,
@@ -263,78 +42,66 @@ async function loadJokes() {
       total_votes: 0,
       rating_percentage: 0
     }));
-    const loadEndTime = Date.now();
     showRandomJoke();
-    window.PerformanceMonitor.trackJokeLoad(loadStartTime, loadEndTime, 'local-fallback');
-    console.log('✅ Loaded local jokes as fallback');
-    
-    // Show warning that ratings won't work
-    if (jokeEl) {
-      const warningEl = document.createElement('div');
-      warningEl.style.cssText = 'background: #fff3cd; color: #856404; padding: 8px; margin: 10px 0; border-radius: 4px; font-size: 14px; text-align: center;';
-      warningEl.textContent = '⚠️ Using offline jokes - ratings will be saved locally only';
-      jokeEl.parentNode.insertBefore(warningEl, jokeEl.nextSibling);
-      
-      // Remove warning after 5 seconds
-      setTimeout(() => {
-        if (warningEl.parentNode) {
-          warningEl.parentNode.removeChild(warningEl);
-        }
-      }, 5000);
-    }
+    console.log('✅ Loaded local jokes immediately');
+  } else {
+    console.warn('No local jokes available, POOR_JOKES is:', POOR_JOKES);
   }
   
-  // 3. Final fallback if no jokes available
+  // Then try to load from API in background
+  try {
+    console.log('Attempting to load jokes from API...');
+    const data = await window.APIManager.request('/jokes');
+    
+    if (data.success && data.jokes && data.jokes.length > 0) {
+      allJokes = data.jokes;
+      // Don't automatically change the joke - just update the available jokes
+      console.log('✅ Loaded jokes from API (background)');
+    } else {
+      console.warn('API returned no jokes or failed:', data);
+    }
+  } catch (error) {
+    console.error('Error loading jokes from API:', error);
+    // Keep using local jokes as fallback
+  }
+  
+  // If we still have no jokes, show an error message
   if (allJokes.length === 0) {
     console.error('No jokes available from any source');
-    window.PerformanceMonitor.trackError(new Error('No jokes available'), 'loadJokes');
     if (jokeEl) {
       jokeEl.textContent = 'Sorry, no jokes available right now. Please try again later.';
     }
   }
 }
 
-// Show random joke with smart prioritization
+// Show random joke
 function showRandomJoke() {
-  if (allJokes.length === 0) return;
+  console.log('showRandomJoke() called, allJokes.length:', allJokes.length);
   
-  // Check if we should reset history (when most jokes have been shown)
-  if (shouldResetHistory()) {
-    console.log('🔄 Resetting display history - most jokes have been shown');
-    clearDisplayHistory();
-  }
-  
-  // Use weighted selection to prioritize unseen jokes
-  const selectedJoke = getWeightedJokeSelection();
-  
-  if (selectedJoke) {
-    // Add to display history
-    addToDisplayHistory(selectedJoke.id);
-    
-    // Show the selected joke
-    showJoke(selectedJoke);
-    
-    // Log selection info for debugging
-    const history = getDisplayHistory();
-    const unseenCount = allJokes.filter(joke => !history.includes(joke.id)).length;
-    console.log(`📊 Joke selection stats: ${unseenCount} unseen, ${history.length} in history`);
-    
-    // Debug: Check if "You look great today" is in the loaded jokes
-    const yourJoke = allJokes.find(joke => joke.content.includes('You look great today'));
-    if (yourJoke) {
-      console.log(`🎯 Your joke is loaded: "${yourJoke.content}" (ID: ${yourJoke.id})`);
-      console.log(`🎯 Your joke has been shown: ${history.includes(yourJoke.id) ? 'YES' : 'NO'}`);
-    } else {
-      console.log('❌ Your joke "You look great today" is NOT in the loaded jokes');
-      console.log('📋 Available jokes:', allJokes.map(j => j.content.substring(0, 30) + '...').slice(0, 5));
+  if (allJokes.length === 0) {
+    console.warn('No jokes available to show');
+    if (jokeEl) {
+      jokeEl.textContent = 'No jokes available. Please try again later.';
     }
+    return;
   }
+  
+  const randomIndex = Math.floor(Math.random() * allJokes.length);
+  showJoke(allJokes[randomIndex]);
 }
 
 // Show specific joke
 function showJoke(joke) {
+  console.log('showJoke() called with:', joke);
   currentJoke = joke;
-  jokeEl.textContent = joke.content;
+  
+  if (jokeEl) {
+    jokeEl.textContent = joke.content;
+    console.log('Displayed joke:', joke.content);
+  } else {
+    console.error('jokeEl is null, cannot display joke');
+  }
+  
   updateRatingDisplay();
 }
 
@@ -387,20 +154,68 @@ async function updateCurrentJokeRatings() {
   }
 }
 
-// Rate a joke
+// Rate a joke with optimistic UI updates
 async function rateJoke(rating) {
-  if (!currentJoke) return;
-  
-  // Check if this is a local joke (fallback) that can't be rated
-  if (currentJoke.id && currentJoke.id.startsWith('local_')) {
-    console.warn('Cannot rate local fallback jokes. Please wait for API jokes to load.');
-    alert('Please wait for jokes to load from the server before rating.');
+  if (!currentJoke) {
+    console.log('No current joke to rate');
     return;
   }
   
   const ratingValue = rating === 'up' ? 1 : -1;
   const previousRating = userRatings[currentJoke.id];
   
+  console.log('Rating joke:', {
+    jokeId: currentJoke.id,
+    rating: rating,
+    ratingValue: ratingValue,
+    previousRating: previousRating
+  });
+  
+  // OPTIMISTIC UPDATE: Update UI immediately
+  const wasRated = previousRating !== undefined;
+  const isSameRating = previousRating === ratingValue;
+  
+  if (isSameRating) {
+    // User clicked the same rating - remove it
+    delete userRatings[currentJoke.id];
+    // Update vote counts optimistically
+    if (ratingValue === 1) {
+      currentJoke.up_votes = Math.max(0, currentJoke.up_votes - 1);
+    } else {
+      currentJoke.down_votes = Math.max(0, currentJoke.down_votes - 1);
+    }
+  } else {
+    // User clicked different rating or new rating
+    if (wasRated) {
+      // Switching from one rating to another
+      if (previousRating === 1) {
+        currentJoke.up_votes = Math.max(0, currentJoke.up_votes - 1);
+      } else {
+        currentJoke.down_votes = Math.max(0, currentJoke.down_votes - 1);
+      }
+    }
+    
+    // Add new rating
+    userRatings[currentJoke.id] = ratingValue;
+    if (ratingValue === 1) {
+      currentJoke.up_votes += 1;
+    } else {
+      currentJoke.down_votes += 1;
+    }
+  }
+  
+  // Update total votes and percentage
+  currentJoke.total_votes = currentJoke.up_votes + currentJoke.down_votes;
+  currentJoke.rating_percentage = currentJoke.total_votes > 0 ? 
+    Math.round((currentJoke.up_votes / currentJoke.total_votes) * 100) : 0;
+  
+  // Update UI immediately
+  updateRatingDisplay();
+  
+  // Save to localStorage immediately
+  localStorage.setItem('userRatings', JSON.stringify(userRatings));
+  
+  // Now sync with server in background
   try {
     const data = await window.APIManager.request('/rate', {
       method: 'POST',
@@ -411,38 +226,19 @@ async function rateJoke(rating) {
       })
     });
     
+    console.log('Rating API response:', data);
+    
     if (data.success) {
-      // Update local user ratings
-      if (data.action === 'removed') {
-        delete userRatings[currentJoke.id];
-      } else {
-        userRatings[currentJoke.id] = ratingValue;
-        // Track rating for performance monitoring
-        window.PerformanceMonitor.trackRating(currentJoke.id, ratingValue);
-      }
-      
-      // Save to localStorage
-      localStorage.setItem('userRatings', JSON.stringify(userRatings));
-      
-      // Update the current joke's rating display without changing the joke
+      // Server confirmed the rating - update with server data
       await updateCurrentJokeRatings();
     } else {
       console.error('Failed to rate joke:', data.error);
+      // Could show a subtle error message here if needed
     }
   } catch (error) {
     console.error('Error rating joke:', error);
-    // Show user-friendly error message for API errors
-    if (error.message.includes('HTTP 500')) {
-      alert('Unable to rate this joke. Please try refreshing the page.');
-    }
-    // Fallback to local rating for offline mode
-    if (previousRating === ratingValue) {
-      delete userRatings[currentJoke.id];
-    } else {
-      userRatings[currentJoke.id] = ratingValue;
-    }
-    localStorage.setItem('userRatings', JSON.stringify(userRatings));
-    updateRatingDisplay();
+    // Rating was already updated optimistically, so user sees immediate feedback
+    // Could show a subtle "offline" indicator if needed
   }
 }
 
@@ -456,7 +252,7 @@ function showSubmissionForm() {
 // Hide submission form
 function hideSubmissionForm() {
   submissionForm.style.display = 'none';
-  submitJokeBtn.style.display = 'block';
+  submitJokeBtn.style.display = 'inline-block';
   jokeTextarea.value = '';
   submissionStatus.textContent = '';
 }
@@ -518,7 +314,6 @@ document.addEventListener('DOMContentLoaded', () => {
     jokeEl,
     nextJokeBtn,
     copyBtn,
-    refreshBtn,
     thumbsUpBtn,
     thumbsDownBtn,
     upCountEl,
@@ -560,31 +355,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Added event listener to copyBtn');
   }
   
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', async () => {
-      refreshBtn.textContent = '⏳';
-      refreshBtn.disabled = true;
-      try {
-        await refreshJokes();
-        refreshBtn.textContent = '✅';
-        
-        // Show stats in console for debugging
-        const history = getDisplayHistory();
-        const unseenCount = allJokes.filter(joke => !history.includes(joke.id)).length;
-        console.log(`📊 After refresh: ${unseenCount} unseen jokes, ${history.length} in history`);
-        
-        setTimeout(() => (refreshBtn.textContent = '🔄'), 2000);
-      } catch (error) {
-        console.error('Refresh failed:', error);
-        refreshBtn.textContent = '❌';
-        setTimeout(() => (refreshBtn.textContent = '🔄'), 2000);
-      } finally {
-        refreshBtn.disabled = false;
-      }
-    });
-    console.log('Added event listener to refreshBtn');
-  }
-  
   if (thumbsUpBtn) {
     thumbsUpBtn.addEventListener('click', () => rateJoke('up'));
     console.log('Added event listener to thumbsUpBtn');
@@ -611,6 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   // Load jokes immediately - don't wait for APIManager
+  console.log('Starting to load jokes...');
   loadJokes();
 });
 

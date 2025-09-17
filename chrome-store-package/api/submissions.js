@@ -1,6 +1,8 @@
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const { validateRequest, logAPIError, logAPISuccess } = require('./validation');
+const { sendApprovalNotification, sendRejectionNotification } = require('../lib/telegram-notifications');
+const { formatJokeContent, formatSubmitterName, validateJokeQuality } = require('../lib/joke-formatter');
 
 // Initialize Supabase client with service role key for admin operations
 const supabase = createClient(
@@ -12,7 +14,7 @@ const supabase = createClient(
 const corsHandler = cors({
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password', 'x-api-version']
 });
 
 export default async function handler(req, res) {
@@ -24,6 +26,13 @@ export default async function handler(req, res) {
   // Apply CORS to all requests
   corsHandler(req, res, async () => {
     try {
+      // Check admin authentication
+      const adminPassword = req.headers['x-admin-password'];
+      const expectedPassword = process.env.ADMIN_PASSWORD || 'PoorJokes2024!Admin';
+      if (adminPassword !== expectedPassword) {
+        return res.status(401).json({ error: 'Unauthorized access' });
+      }
+
       // Add validation middleware
       validateRequest(req, res, async () => {
         switch (req.method) {
@@ -98,12 +107,22 @@ async function reviewSubmission(req, res) {
     }
 
     if (action === 'approve') {
+      // Format the joke content before adding to main table
+      const contentResult = formatJokeContent(submission.content);
+      
+      if (!contentResult.isValid) {
+        return res.status(400).json({
+          error: 'Cannot approve joke with invalid content',
+          details: contentResult.errors
+        });
+      }
+
       // Check for duplicates before approving
       const { data: existingJokes, error: duplicateError } = await supabase
         .from('jokes')
         .select('id, content')
         .eq('is_active', true)
-        .ilike('content', submission.content);
+        .ilike('content', contentResult.formatted);
 
       if (duplicateError) {
         throw duplicateError;
@@ -121,12 +140,15 @@ async function reviewSubmission(req, res) {
         });
       }
 
-      // Add the joke to the main jokes table
+      // Validate joke quality
+      const qualityCheck = validateJokeQuality(contentResult.formatted);
+      
+      // Add the joke to the main jokes table with formatted content
       const { data: newJoke, error: insertError } = await supabase
         .from('jokes')
         .insert([
           {
-            content: submission.content
+            content: contentResult.formatted
           }
         ])
         .select()
@@ -150,6 +172,9 @@ async function reviewSubmission(req, res) {
         throw updateError;
       }
 
+      // Send approval notification
+      await sendApprovalNotification(submission);
+
       return res.status(200).json({
         success: true,
         message: 'Joke approved and added to the collection',
@@ -170,6 +195,9 @@ async function reviewSubmission(req, res) {
       if (updateError) {
         throw updateError;
       }
+
+      // Send rejection notification
+      await sendRejectionNotification(submission, rejection_reason);
 
       return res.status(200).json({
         success: true,

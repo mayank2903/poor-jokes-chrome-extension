@@ -17,7 +17,7 @@ const supabaseAdmin = createClient(
 const corsHandler = cors({
   origin: true,
   methods: ['POST', 'PUT', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-version']
 });
 
 export default async function handler(req, res) {

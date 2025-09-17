@@ -1,7 +1,7 @@
 # Poor Jokes New Tab - Chrome Web Store Package
 
-## Version 1.0.0
-Generated: 2025-09-14T16:54:25.801Z
+## Version 1.0.1
+Generated: 2025-09-17T14:34:26.515Z
 
 ## Files Included
 - manifest.json (Chrome Web Store manifest)

@@ -1,6 +1,8 @@
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const { validateRequest, logAPIError, logAPISuccess } = require('./validation');
+const { sendSubmissionNotification } = require('../lib/telegram-notifications');
+const { formatJokeContent, formatSubmitterName, validateJokeQuality } = require('../lib/joke-formatter');
 
 // Initialize Supabase clients
 const supabase = createClient(
@@ -18,7 +20,7 @@ const supabaseAdmin = createClient(
 const corsHandler = cors({
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-version']
 });
 
 export default async function handler(req, res) {
@@ -48,31 +50,65 @@ export default async function handler(req, res) {
   });
 }
 
-// Get all active jokes with their ratings
+// Get active jokes with pagination and optimized ratings query
 async function getJokes(req, res) {
   try {
+    // Parse pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100); // Max 100 jokes per request
+    const offset = (page - 1) * limit;
+    
+    // Get total count for pagination metadata
+    const { count: totalJokes, error: countError } = await supabase
+      .from('jokes')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true);
+
+    if (countError) {
+      throw countError;
+    }
+
+    // Get paginated jokes with optimized query
     const { data: jokes, error: jokesError } = await supabase
       .from('jokes')
       .select(`
         id,
         content,
-        created_at,
-        joke_ratings (
-          rating
-        )
+        created_at
       `)
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (jokesError) {
       throw jokesError;
     }
 
+    // Get ratings for these specific jokes in a single query
+    const jokeIds = jokes.map(joke => joke.id);
+    const { data: ratings, error: ratingsError } = await supabase
+      .from('joke_ratings')
+      .select('joke_id, rating')
+      .in('joke_id', jokeIds);
+
+    if (ratingsError) {
+      throw ratingsError;
+    }
+
+    // Group ratings by joke_id for efficient processing
+    const ratingsByJoke = {};
+    ratings.forEach(rating => {
+      if (!ratingsByJoke[rating.joke_id]) {
+        ratingsByJoke[rating.joke_id] = [];
+      }
+      ratingsByJoke[rating.joke_id].push(rating.rating);
+    });
+
     // Calculate rating statistics for each joke
     const jokesWithRatings = jokes.map(joke => {
-      const ratings = joke.joke_ratings || [];
-      const upVotes = ratings.filter(r => r.rating === 1).length;
-      const downVotes = ratings.filter(r => r.rating === -1).length;
+      const jokeRatings = ratingsByJoke[joke.id] || [];
+      const upVotes = jokeRatings.filter(r => r === 1).length;
+      const downVotes = jokeRatings.filter(r => r === -1).length;
       const totalVotes = upVotes + downVotes;
       const ratingPercentage = totalVotes > 0 ? Math.round((upVotes / totalVotes) * 100) : 0;
 
@@ -87,10 +123,30 @@ async function getJokes(req, res) {
       };
     });
 
-    logAPISuccess('GET /api/jokes', 'fetch_jokes', { count: jokesWithRatings.length });
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalJokes / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    logAPISuccess('GET /api/jokes', 'fetch_jokes', { 
+      count: jokesWithRatings.length,
+      page,
+      limit,
+      totalJokes,
+      totalPages
+    });
+
     return res.status(200).json({
       success: true,
-      jokes: jokesWithRatings
+      jokes: jokesWithRatings,
+      pagination: {
+        page,
+        limit,
+        totalJokes,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
+      }
     });
   } catch (error) {
     logAPIError('GET /api/jokes', error);
@@ -151,18 +207,26 @@ async function submitJoke(req, res) {
   try {
     const { content, submitted_by } = req.body;
 
-    if (!content || content.trim().length === 0) {
-      return res.status(400).json({ error: 'Joke content is required' });
+    // Format and validate joke content
+    const contentResult = formatJokeContent(content);
+    
+    if (!contentResult.isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid joke content',
+        details: contentResult.errors,
+        formatted: contentResult.formatted
+      });
     }
-
-    if (content.length > 500) {
-      return res.status(400).json({ error: 'Joke content is too long (max 500 characters)' });
-    }
-
-    const trimmedContent = content.trim();
 
     // Check for duplicates
-    const duplicateCheck = await checkDuplicateJoke(trimmedContent);
+    const duplicateCheck = await checkDuplicateJoke(contentResult.formatted);
+    
+    console.log('Duplicate check result:', {
+      isDuplicate: duplicateCheck.isDuplicate,
+      existingJokes: duplicateCheck.existingJokes.length,
+      pendingSubmissions: duplicateCheck.pendingSubmissions.length,
+      content: contentResult.formatted
+    });
     
     if (duplicateCheck.isDuplicate) {
       // Gracefully accept the submission but don't write to database
@@ -176,16 +240,31 @@ async function submitJoke(req, res) {
         success: true,
         message: 'Thank you for your submission! This joke is already in our collection.',
         submission_id: null,
+        quality_score: qualityCheck.percentage,
+        formatted_content: contentResult.formatted,
         duplicate_detected: true
       });
     }
+
+    // Format submitter name
+    const formattedSubmitter = formatSubmitterName(submitted_by);
+
+    // Validate joke quality
+    const qualityCheck = validateJokeQuality(contentResult.formatted);
+    
+    // Log quality metrics for monitoring
+    console.log('Joke quality check:', {
+      score: qualityCheck.percentage,
+      isHighQuality: qualityCheck.isHighQuality,
+      checks: qualityCheck
+    });
 
     const { data, error } = await supabaseAdmin
       .from('joke_submissions')
       .insert([
         {
-          content: trimmedContent,
-          submitted_by: submitted_by || 'anonymous'
+          content: contentResult.formatted,
+          submitted_by: formattedSubmitter
         }
       ])
       .select()
@@ -195,11 +274,21 @@ async function submitJoke(req, res) {
       throw error;
     }
 
-    logAPISuccess('POST /api/jokes', 'submit_joke', { submission_id: data.id });
+    logAPISuccess('POST /api/jokes', 'submit_joke', { 
+      submission_id: data.id,
+      quality_score: qualityCheck.percentage,
+      word_count: contentResult.wordCount
+    });
+    
+    // Send notification for new submission
+    await sendSubmissionNotification(data);
+    
     return res.status(201).json({
       success: true,
       message: 'Joke submitted successfully! It will be reviewed before being added.',
-      submission_id: data.id
+      submission_id: data.id,
+      quality_score: qualityCheck.percentage,
+      formatted_content: contentResult.formatted
     });
   } catch (error) {
     logAPIError('POST /api/jokes', error, req.body);
