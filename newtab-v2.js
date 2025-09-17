@@ -30,6 +30,8 @@ function generateUserId() {
 
 // Load jokes from API using APIManager with immediate fallback
 async function loadJokes() {
+  console.log('loadJokes() called');
+  
   // Show local joke immediately for better UX
   if (POOR_JOKES && POOR_JOKES.length > 0) {
     allJokes = POOR_JOKES.map((content, index) => ({
@@ -42,26 +44,47 @@ async function loadJokes() {
     }));
     showRandomJoke();
     console.log('✅ Loaded local jokes immediately');
+  } else {
+    console.warn('No local jokes available, POOR_JOKES is:', POOR_JOKES);
   }
   
   // Then try to load from API in background
   try {
+    console.log('Attempting to load jokes from API...');
     const data = await window.APIManager.request('/jokes');
     
     if (data.success && data.jokes && data.jokes.length > 0) {
       allJokes = data.jokes;
       // Don't automatically change the joke - just update the available jokes
       console.log('✅ Loaded jokes from API (background)');
+    } else {
+      console.warn('API returned no jokes or failed:', data);
     }
   } catch (error) {
     console.error('Error loading jokes from API:', error);
     // Keep using local jokes as fallback
   }
+  
+  // If we still have no jokes, show an error message
+  if (allJokes.length === 0) {
+    console.error('No jokes available from any source');
+    if (jokeEl) {
+      jokeEl.textContent = 'Sorry, no jokes available right now. Please try again later.';
+    }
+  }
 }
 
 // Show random joke
 function showRandomJoke() {
-  if (allJokes.length === 0) return;
+  console.log('showRandomJoke() called, allJokes.length:', allJokes.length);
+  
+  if (allJokes.length === 0) {
+    console.warn('No jokes available to show');
+    if (jokeEl) {
+      jokeEl.textContent = 'No jokes available. Please try again later.';
+    }
+    return;
+  }
   
   const randomIndex = Math.floor(Math.random() * allJokes.length);
   showJoke(allJokes[randomIndex]);
@@ -69,8 +92,16 @@ function showRandomJoke() {
 
 // Show specific joke
 function showJoke(joke) {
+  console.log('showJoke() called with:', joke);
   currentJoke = joke;
-  jokeEl.textContent = joke.content;
+  
+  if (jokeEl) {
+    jokeEl.textContent = joke.content;
+    console.log('Displayed joke:', joke.content);
+  } else {
+    console.error('jokeEl is null, cannot display joke');
+  }
+  
   updateRatingDisplay();
 }
 
@@ -276,26 +307,81 @@ async function submitJokeToAPI() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  // Set up event listeners after DOM is loaded
-  if (nextJokeBtn) nextJokeBtn.addEventListener('click', showRandomJoke);
-  if (copyBtn) copyBtn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(jokeEl.textContent);
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => (copyBtn.textContent = 'Copy'), 1200);
-    } catch (err) {
-      console.error('Copy failed', err);
-      copyBtn.textContent = 'Copy failed';
-      setTimeout(() => (copyBtn.textContent = 'Copy'), 1200);
+  console.log('DOM loaded, initializing newtab-v2.js');
+  
+  // Check if required elements exist
+  const requiredElements = {
+    jokeEl,
+    nextJokeBtn,
+    copyBtn,
+    thumbsUpBtn,
+    thumbsDownBtn,
+    upCountEl,
+    downCountEl,
+    ratingStatsEl,
+    submitJokeBtn,
+    submissionForm,
+    jokeTextarea,
+    submitJoke,
+    cancelSubmission,
+    submissionStatus
+  };
+  
+  // Log missing elements for debugging
+  Object.entries(requiredElements).forEach(([name, element]) => {
+    if (!element) {
+      console.error(`Missing required element: ${name}`);
     }
   });
-  if (thumbsUpBtn) thumbsUpBtn.addEventListener('click', () => rateJoke('up'));
-  if (thumbsDownBtn) thumbsDownBtn.addEventListener('click', () => rateJoke('down'));
-  if (submitJokeBtn) submitJokeBtn.addEventListener('click', showSubmissionForm);
-  if (cancelSubmission) cancelSubmission.addEventListener('click', hideSubmissionForm);
-  if (submitJoke) submitJoke.addEventListener('click', submitJokeToAPI);
+  
+  // Set up event listeners after DOM is loaded
+  if (nextJokeBtn) {
+    nextJokeBtn.addEventListener('click', showRandomJoke);
+    console.log('Added event listener to nextJokeBtn');
+  }
+  
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(jokeEl.textContent);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => (copyBtn.textContent = 'Copy'), 1200);
+      } catch (err) {
+        console.error('Copy failed', err);
+        copyBtn.textContent = 'Copy failed';
+        setTimeout(() => (copyBtn.textContent = 'Copy'), 1200);
+      }
+    });
+    console.log('Added event listener to copyBtn');
+  }
+  
+  if (thumbsUpBtn) {
+    thumbsUpBtn.addEventListener('click', () => rateJoke('up'));
+    console.log('Added event listener to thumbsUpBtn');
+  }
+  
+  if (thumbsDownBtn) {
+    thumbsDownBtn.addEventListener('click', () => rateJoke('down'));
+    console.log('Added event listener to thumbsDownBtn');
+  }
+  
+  if (submitJokeBtn) {
+    submitJokeBtn.addEventListener('click', showSubmissionForm);
+    console.log('Added event listener to submitJokeBtn');
+  }
+  
+  if (cancelSubmission) {
+    cancelSubmission.addEventListener('click', hideSubmissionForm);
+    console.log('Added event listener to cancelSubmission');
+  }
+  
+  if (submitJoke) {
+    submitJoke.addEventListener('click', submitJokeToAPI);
+    console.log('Added event listener to submitJoke');
+  }
   
   // Load jokes immediately - don't wait for APIManager
+  console.log('Starting to load jokes...');
   loadJokes();
 });
 
