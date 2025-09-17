@@ -100,6 +100,54 @@ async function getJokes(req, res) {
   }
 }
 
+// Check for duplicate jokes
+async function checkDuplicateJoke(content) {
+  try {
+    // Normalize content for comparison (trim, lowercase, remove extra spaces)
+    const normalizedContent = content.trim().toLowerCase().replace(/\s+/g, ' ');
+    
+    // Check in active jokes table
+    const { data: existingJokes, error: jokesError } = await supabase
+      .from('jokes')
+      .select('id, content')
+      .eq('is_active', true);
+
+    if (jokesError) {
+      throw jokesError;
+    }
+
+    // Check in pending submissions
+    const { data: pendingSubmissions, error: submissionsError } = await supabase
+      .from('joke_submissions')
+      .select('id, content')
+      .eq('status', 'pending');
+
+    if (submissionsError) {
+      throw submissionsError;
+    }
+
+    // Check for duplicates using normalized comparison
+    const duplicateJokes = existingJokes.filter(joke => 
+      joke.content.trim().toLowerCase().replace(/\s+/g, ' ') === normalizedContent
+    );
+    
+    const duplicateSubmissions = pendingSubmissions.filter(submission => 
+      submission.content.trim().toLowerCase().replace(/\s+/g, ' ') === normalizedContent
+    );
+
+    return {
+      isDuplicate: duplicateJokes.length > 0 || duplicateSubmissions.length > 0,
+      existingJokes: duplicateJokes,
+      pendingSubmissions: duplicateSubmissions
+    };
+  } catch (error) {
+    console.error('Error checking for duplicates:', error);
+    // If there's an error checking duplicates, we'll allow the submission
+    // but log the error for monitoring
+    return { isDuplicate: false, existingJokes: [], pendingSubmissions: [] };
+  }
+}
+
 // Submit a new joke
 async function submitJoke(req, res) {
   try {
@@ -113,6 +161,34 @@ async function submitJoke(req, res) {
         error: 'Invalid joke content',
         details: contentResult.errors,
         formatted: contentResult.formatted
+      });
+    }
+
+    // Check for duplicates
+    const duplicateCheck = await checkDuplicateJoke(contentResult.formatted);
+    
+    console.log('Duplicate check result:', {
+      isDuplicate: duplicateCheck.isDuplicate,
+      existingJokes: duplicateCheck.existingJokes.length,
+      pendingSubmissions: duplicateCheck.pendingSubmissions.length,
+      content: contentResult.formatted
+    });
+    
+    if (duplicateCheck.isDuplicate) {
+      // Gracefully accept the submission but don't write to database
+      logAPISuccess('POST /api/jokes', 'duplicate_joke_submission', { 
+        duplicate_type: 'detected',
+        existing_jokes: duplicateCheck.existingJokes.length,
+        pending_submissions: duplicateCheck.pendingSubmissions.length
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Thank you for your submission! This joke is already in our collection.',
+        submission_id: null,
+        quality_score: qualityCheck.percentage,
+        formatted_content: contentResult.formatted,
+        duplicate_detected: true
       });
     }
 

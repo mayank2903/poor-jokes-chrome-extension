@@ -117,6 +117,29 @@ async function reviewSubmission(req, res) {
         });
       }
 
+      // Check for duplicates before approving
+      const { data: existingJokes, error: duplicateError } = await supabase
+        .from('jokes')
+        .select('id, content')
+        .eq('is_active', true)
+        .ilike('content', contentResult.formatted);
+
+      if (duplicateError) {
+        throw duplicateError;
+      }
+
+      if (existingJokes && existingJokes.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'Duplicate joke detected',
+          message: 'This joke already exists in the active jokes collection.',
+          duplicate_jokes: existingJokes.map(joke => ({
+            id: joke.id,
+            content: joke.content
+          }))
+        });
+      }
+
       // Validate joke quality
       const qualityCheck = validateJokeQuality(contentResult.formatted);
       

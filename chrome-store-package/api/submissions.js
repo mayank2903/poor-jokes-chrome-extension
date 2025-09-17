@@ -98,6 +98,29 @@ async function reviewSubmission(req, res) {
     }
 
     if (action === 'approve') {
+      // Check for duplicates before approving
+      const { data: existingJokes, error: duplicateError } = await supabase
+        .from('jokes')
+        .select('id, content')
+        .eq('is_active', true)
+        .ilike('content', submission.content);
+
+      if (duplicateError) {
+        throw duplicateError;
+      }
+
+      if (existingJokes && existingJokes.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'Duplicate joke detected',
+          message: 'This joke already exists in the active jokes collection.',
+          duplicate_jokes: existingJokes.map(joke => ({
+            id: joke.id,
+            content: joke.content
+          }))
+        });
+      }
+
       // Add the joke to the main jokes table
       const { data: newJoke, error: insertError } = await supabase
         .from('jokes')
