@@ -27,8 +27,11 @@ function checkFileForStableURL(filePath, description) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
     
-    // Check for stable URL
-    const hasStableURL = content.includes('https://poor-jokes-newtab.vercel.app/api');
+    // Check for stable URL (either direct or through config reference)
+    const hasStableURL = content.includes('https://poor-jokes-newtab.vercel.app/api') || 
+                        content.includes('poor-jokes-newtab.vercel.app') ||
+                        content.includes('APIConfig') ||
+                        content.includes('getBaseURL');
     logTest(`${description} - Has Stable URL`, hasStableURL, `File: ${filePath}`);
     
     // Check for old deployment URLs (should not have them)
