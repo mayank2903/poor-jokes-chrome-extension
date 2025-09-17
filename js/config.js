@@ -1,26 +1,30 @@
-// API Configuration with Environment Detection
-// This ensures the correct API version is always used
+// API Configuration with Centralized URL Management
+// Uses centralized URL configuration to prevent drift
 
 class APIConfig {
   constructor() {
+    // Import centralized URLs
+    this.urls = window.URLConfig ? window.URLConfig.urls : {
+      API: 'https://poor-jokes-newtab.vercel.app/api',
+      BASE: 'https://poor-jokes-newtab.vercel.app'
+    };
+    
     this.environments = {
       development: {
-        baseUrl: 'http://localhost:3001/api',
+        baseUrl: this.urls.API,
         version: '1.0.0-dev',
         cacheBust: true
       },
       production: {
-        baseUrl: 'https://poor-jokes-newtab-6ewxclhxr-mayanks-projects-72f678fa.vercel.app/api',
+        baseUrl: this.urls.API,
         version: '1.0.0',
         cacheBust: false
       }
     };
     
-    // Fallback URLs for API failover
+    // Fallback URLs for API failover - only use stable URL
     this.FALLBACK_URLS = [
-      'https://poor-jokes-newtab-ch7te6lzr-mayanks-projects-72f678fa.vercel.app/api',
-      'https://poor-jokes-newtab-6yax4u0s4-mayanks-projects-72f678fa.vercel.app/api',
-      'https://poor-jokes-newtab-kcr9acwtg-mayanks-projects-72f678fa.vercel.app/api'
+      this.urls.API
     ];
     
     this.currentEnv = this.detectEnvironment();

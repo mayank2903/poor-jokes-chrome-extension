@@ -4,7 +4,7 @@
 
 const fetch = require('node-fetch');
 
-const API_BASE = 'https://poor-jokes-newtab-kcr9acwtg-mayanks-projects-72f678fa.vercel.app';
+const API_BASE = 'https://poor-jokes-newtab.vercel.app';
 
 async function testTelegramFlow() {
   console.log('🧪 Testing Telegram Flow...\n');

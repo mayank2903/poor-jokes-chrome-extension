@@ -28,8 +28,8 @@ let userId = localStorage.getItem('userId') || generateUserId();
 const CACHE_CONFIG = {
   JOKES_KEY: 'poorJokes_cache',
   LAST_FETCH_KEY: 'poorJokes_lastFetch',
-  REFRESH_INTERVAL: 3600000, // 1 hour in milliseconds
-  MAX_CACHE_AGE: 86400000 // 24 hours max cache age
+  REFRESH_INTERVAL: 300000, // 5 minutes in milliseconds (reduced from 1 hour)
+  MAX_CACHE_AGE: 1800000 // 30 minutes max cache age (reduced from 24 hours)
 };
 
 // Display history configuration
@@ -226,63 +226,68 @@ function getWeightedJokeSelection() {
   return allJokes[Math.floor(Math.random() * allJokes.length)];
 }
 
-// Load jokes using hybrid caching strategy
+// Load jokes using smart caching strategy
 async function loadJokes() {
-  console.log('🔄 Loading jokes with hybrid caching...');
+  const loadStartTime = Date.now();
+  console.log('🔄 Loading jokes with smart caching...');
   
-  // 1. Try to load cached jokes first for instant UX
-  const cachedJokes = getCachedJokes();
-  if (cachedJokes.length > 0) {
-    allJokes = cachedJokes;
-    showRandomJoke();
-    console.log('⚡ Loaded cached jokes instantly:', cachedJokes.length);
-  } else {
-    // 2. Fallback to local jokes if no cache
-    if (POOR_JOKES && POOR_JOKES.length > 0) {
-      allJokes = POOR_JOKES.map((content, index) => ({
-        id: `local_${index}`,
-        content: content,
-        up_votes: 0,
-        down_votes: 0,
-        total_votes: 0,
-        rating_percentage: 0
-      }));
-      showRandomJoke();
-      console.log('✅ Loaded local jokes as fallback');
-    }
-  }
-  
-  // 3. Check if we should refresh from API
-  const needsRefresh = shouldRefreshJokes();
-  
-  if (needsRefresh) {
-    console.log('🌐 Fetching fresh jokes from API...');
-    
-    try {
-      const data = await window.APIManager.request('/jokes');
+  // 1. Try to get a joke from smart cache first
+  try {
+    const joke = await window.SmartJokeCache.getRandomJoke();
+    if (joke) {
+      const loadEndTime = Date.now();
+      showJoke(joke);
+      window.PerformanceMonitor.trackJokeLoad(loadStartTime, loadEndTime, 'smart-cache');
+      window.PerformanceMonitor.trackCacheHit();
+      console.log('⚡ Loaded joke from smart cache');
       
-      if (data.success && data.jokes && data.jokes.length > 0) {
-        allJokes = data.jokes;
-        cacheJokes(data.jokes);
-        
-        // Only change the displayed joke if we had no cached jokes
-        if (cachedJokes.length === 0) {
-          showRandomJoke();
+      // Trigger background prefetch if needed
+      window.SmartJokeCache.smartPrefetch();
+      return;
+    } else {
+      console.warn('⚠️ Smart cache returned null, falling back to local jokes');
+    }
+  } catch (error) {
+    console.error('❌ Error getting joke from smart cache:', error);
+    window.PerformanceMonitor.trackError(error, 'smart-cache');
+    window.PerformanceMonitor.trackCacheMiss();
+  }
+  
+  // 2. Fallback to local jokes if smart cache fails
+  if (POOR_JOKES && POOR_JOKES.length > 0) {
+    allJokes = POOR_JOKES.map((content, index) => ({
+      id: `local_${index}`,
+      content: content,
+      up_votes: 0,
+      down_votes: 0,
+      total_votes: 0,
+      rating_percentage: 0
+    }));
+    const loadEndTime = Date.now();
+    showRandomJoke();
+    window.PerformanceMonitor.trackJokeLoad(loadStartTime, loadEndTime, 'local-fallback');
+    console.log('✅ Loaded local jokes as fallback');
+    
+    // Show warning that ratings won't work
+    if (jokeEl) {
+      const warningEl = document.createElement('div');
+      warningEl.style.cssText = 'background: #fff3cd; color: #856404; padding: 8px; margin: 10px 0; border-radius: 4px; font-size: 14px; text-align: center;';
+      warningEl.textContent = '⚠️ Using offline jokes - ratings will be saved locally only';
+      jokeEl.parentNode.insertBefore(warningEl, jokeEl.nextSibling);
+      
+      // Remove warning after 5 seconds
+      setTimeout(() => {
+        if (warningEl.parentNode) {
+          warningEl.parentNode.removeChild(warningEl);
         }
-        
-        console.log('✅ Loaded fresh jokes from API:', data.jokes.length);
-      } else {
-        console.warn('API returned no jokes or failed:', data);
-      }
-    } catch (error) {
-      console.error('Error loading jokes from API:', error);
-      // Keep using cached or local jokes as fallback
+      }, 5000);
     }
   }
   
-  // 4. Final fallback if no jokes available
+  // 3. Final fallback if no jokes available
   if (allJokes.length === 0) {
     console.error('No jokes available from any source');
+    window.PerformanceMonitor.trackError(new Error('No jokes available'), 'loadJokes');
     if (jokeEl) {
       jokeEl.textContent = 'Sorry, no jokes available right now. Please try again later.';
     }
@@ -313,6 +318,16 @@ function showRandomJoke() {
     const history = getDisplayHistory();
     const unseenCount = allJokes.filter(joke => !history.includes(joke.id)).length;
     console.log(`📊 Joke selection stats: ${unseenCount} unseen, ${history.length} in history`);
+    
+    // Debug: Check if "You look great today" is in the loaded jokes
+    const yourJoke = allJokes.find(joke => joke.content.includes('You look great today'));
+    if (yourJoke) {
+      console.log(`🎯 Your joke is loaded: "${yourJoke.content}" (ID: ${yourJoke.id})`);
+      console.log(`🎯 Your joke has been shown: ${history.includes(yourJoke.id) ? 'YES' : 'NO'}`);
+    } else {
+      console.log('❌ Your joke "You look great today" is NOT in the loaded jokes');
+      console.log('📋 Available jokes:', allJokes.map(j => j.content.substring(0, 30) + '...').slice(0, 5));
+    }
   }
 }
 
@@ -376,6 +391,13 @@ async function updateCurrentJokeRatings() {
 async function rateJoke(rating) {
   if (!currentJoke) return;
   
+  // Check if this is a local joke (fallback) that can't be rated
+  if (currentJoke.id && currentJoke.id.startsWith('local_')) {
+    console.warn('Cannot rate local fallback jokes. Please wait for API jokes to load.');
+    alert('Please wait for jokes to load from the server before rating.');
+    return;
+  }
+  
   const ratingValue = rating === 'up' ? 1 : -1;
   const previousRating = userRatings[currentJoke.id];
   
@@ -395,6 +417,8 @@ async function rateJoke(rating) {
         delete userRatings[currentJoke.id];
       } else {
         userRatings[currentJoke.id] = ratingValue;
+        // Track rating for performance monitoring
+        window.PerformanceMonitor.trackRating(currentJoke.id, ratingValue);
       }
       
       // Save to localStorage
@@ -407,6 +431,10 @@ async function rateJoke(rating) {
     }
   } catch (error) {
     console.error('Error rating joke:', error);
+    // Show user-friendly error message for API errors
+    if (error.message.includes('HTTP 500')) {
+      alert('Unable to rate this joke. Please try refreshing the page.');
+    }
     // Fallback to local rating for offline mode
     if (previousRating === ratingValue) {
       delete userRatings[currentJoke.id];

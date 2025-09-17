@@ -49,7 +49,7 @@ Create the following images for your store listing:
 See store-assets/store-listing.md for the complete store listing content.
 
 ## Support
-- Website: https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app
-- Admin: https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app/admin
+- Website: https://poor-jokes-newtab.vercel.app
+- Admin: https://poor-jokes-newtab.vercel.app/admin
 
 Good luck with your Chrome Web Store submission! 🎭✨

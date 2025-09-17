@@ -50,31 +50,65 @@ export default async function handler(req, res) {
   });
 }
 
-// Get all active jokes with their ratings
+// Get active jokes with pagination and optimized ratings query
 async function getJokes(req, res) {
   try {
+    // Parse pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100); // Max 100 jokes per request
+    const offset = (page - 1) * limit;
+    
+    // Get total count for pagination metadata
+    const { count: totalJokes, error: countError } = await supabase
+      .from('jokes')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true);
+
+    if (countError) {
+      throw countError;
+    }
+
+    // Get paginated jokes with optimized query
     const { data: jokes, error: jokesError } = await supabase
       .from('jokes')
       .select(`
         id,
         content,
-        created_at,
-        joke_ratings (
-          rating
-        )
+        created_at
       `)
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (jokesError) {
       throw jokesError;
     }
 
+    // Get ratings for these specific jokes in a single query
+    const jokeIds = jokes.map(joke => joke.id);
+    const { data: ratings, error: ratingsError } = await supabase
+      .from('joke_ratings')
+      .select('joke_id, rating')
+      .in('joke_id', jokeIds);
+
+    if (ratingsError) {
+      throw ratingsError;
+    }
+
+    // Group ratings by joke_id for efficient processing
+    const ratingsByJoke = {};
+    ratings.forEach(rating => {
+      if (!ratingsByJoke[rating.joke_id]) {
+        ratingsByJoke[rating.joke_id] = [];
+      }
+      ratingsByJoke[rating.joke_id].push(rating.rating);
+    });
+
     // Calculate rating statistics for each joke
     const jokesWithRatings = jokes.map(joke => {
-      const ratings = joke.joke_ratings || [];
-      const upVotes = ratings.filter(r => r.rating === 1).length;
-      const downVotes = ratings.filter(r => r.rating === -1).length;
+      const jokeRatings = ratingsByJoke[joke.id] || [];
+      const upVotes = jokeRatings.filter(r => r === 1).length;
+      const downVotes = jokeRatings.filter(r => r === -1).length;
       const totalVotes = upVotes + downVotes;
       const ratingPercentage = totalVotes > 0 ? Math.round((upVotes / totalVotes) * 100) : 0;
 
@@ -89,10 +123,30 @@ async function getJokes(req, res) {
       };
     });
 
-    logAPISuccess('GET /api/jokes', 'fetch_jokes', { count: jokesWithRatings.length });
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalJokes / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    logAPISuccess('GET /api/jokes', 'fetch_jokes', { 
+      count: jokesWithRatings.length,
+      page,
+      limit,
+      totalJokes,
+      totalPages
+    });
+
     return res.status(200).json({
       success: true,
-      jokes: jokesWithRatings
+      jokes: jokesWithRatings,
+      pagination: {
+        page,
+        limit,
+        totalJokes,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
+      }
     });
   } catch (error) {
     logAPIError('GET /api/jokes', error);

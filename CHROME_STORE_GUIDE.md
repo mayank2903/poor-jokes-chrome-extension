@@ -199,8 +199,8 @@ jokes, humor, comedy, new tab, entertainment, funny, laughter, poor jokes, bad j
 
 ### **Your Extension URLs**
 
-- **Main Site**: https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app
-- **Admin Dashboard**: https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app/admin
-- **API**: https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app/api
+- **Main Site**: https://poor-jokes-newtab.vercel.app
+- **Admin Dashboard**: https://poor-jokes-newtab.vercel.app/admin
+- **API**: https://poor-jokes-newtab.vercel.app/api
 
 Good luck with your Chrome Web Store submission! 🎭✨
