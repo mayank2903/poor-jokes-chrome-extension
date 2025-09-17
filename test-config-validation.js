@@ -59,20 +59,19 @@ function validateManifest() {
     logTest('Manifest - Correct Version', correctVersion, `Version: ${manifest.version}`);
     
     // Check permissions
-    const hasPermissions = manifest.permissions && manifest.permissions.includes('activeTab');
-    logTest('Manifest - Has Permissions', hasPermissions, 'Has activeTab permission');
+    const hasNewTabOverride = manifest.chrome_url_overrides && manifest.chrome_url_overrides.newtab;
+    logTest('Manifest - Has New Tab Override', hasNewTabOverride, 'Has newtab override configured');
     
-    // Check host permissions
-    const hasHostPermissions = manifest.host_permissions && 
-      manifest.host_permissions.some(url => url.includes('poor-jokes-newtab.vercel.app'));
-    logTest('Manifest - Has Host Permissions', hasHostPermissions, 'Has stable URL in host_permissions');
+    // Check host permissions (not required for new tab extensions)
+    const hasHostPermissions = !manifest.host_permissions || manifest.host_permissions.length === 0;
+    logTest('Manifest - No Host Permissions', hasHostPermissions, 'No host permissions needed for new tab extension');
     
     // Check for old URLs in host permissions
     const hasOldHostURLs = manifest.host_permissions && 
       manifest.host_permissions.some(url => url.includes('poor-jokes-newtab-') && url.includes('mayanks-projects-72f678fa.vercel.app'));
     logTest('Manifest - No Old Host URLs', !hasOldHostURLs, 'No old deployment URLs in host_permissions');
     
-    return hasRequiredFields && correctVersion && hasPermissions && hasHostPermissions && !hasOldHostURLs;
+    return hasRequiredFields && correctVersion && hasNewTabOverride && hasHostPermissions && !hasOldHostURLs;
     
   } catch (error) {
     logTest('Manifest - Parse', false, `Error: ${error.message}`);

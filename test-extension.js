@@ -201,8 +201,8 @@ async function testManifest() {
     const hasRequiredFields = manifest.name && manifest.version && manifest.manifest_version;
     logTest('Manifest Structure', hasRequiredFields, 'Has name, version, manifest_version');
     
-    const hasNewTabPermission = manifest.permissions && manifest.permissions.includes('activeTab');
-    logTest('New Tab Permission', hasNewTabPermission, 'Has activeTab permission');
+    const hasNewTabOverride = manifest.chrome_url_overrides && manifest.chrome_url_overrides.newtab;
+    logTest('New Tab Override', hasNewTabOverride, 'Has newtab override configured');
     
     const hasIcons = manifest.icons && manifest.icons['16'] && manifest.icons['48'] && manifest.icons['128'];
     logTest('Icons Configuration', hasIcons, 'Has 16px, 48px, 128px icons');
