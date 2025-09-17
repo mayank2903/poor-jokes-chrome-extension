@@ -258,6 +258,26 @@ button:active {
   transform: translateY(0);
 }
 
+/* Refresh button specific styling */
+#refresh {
+  background: rgba(40, 167, 69, 0.2);
+  border-color: rgba(40, 167, 69, 0.4);
+  padding: 0.75rem;
+  min-width: 3rem;
+  font-size: 1.2rem;
+}
+
+#refresh:hover {
+  background: rgba(40, 167, 69, 0.3);
+  border-color: rgba(40, 167, 69, 0.6);
+}
+
+#refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Footer styling */
 footer {
   font-size: 0.9rem;

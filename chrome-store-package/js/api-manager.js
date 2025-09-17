@@ -6,9 +6,7 @@ class APIManager {
     this.config = window.APIConfig;
     this.healthCheckInterval = null;
     this.fallbackUrls = [
-      'https://poor-jokes-newtab-m791yuiy6-mayanks-projects-72f678fa.vercel.app/api',
-      'https://poor-jokes-newtab-ohv70wfm5-mayanks-projects-72f678fa.vercel.app/api',
-      'https://poor-jokes-newtab-oinwxu8hz-mayanks-projects-72f678fa.vercel.app/api'
+      'https://poor-jokes-newtab.vercel.app/api' // Only use stable production URL
     ];
     this.currentUrlIndex = 0;
     this.isHealthy = true;
@@ -21,7 +19,8 @@ class APIManager {
       return this.config.getBaseURL();
     }
     
-    return this.fallbackUrls[this.currentUrlIndex] || this.config.getBaseURL();
+    // Always use the stable production URL
+    return 'https://poor-jokes-newtab.vercel.app/api';
   }
 
   // Health check for API endpoint
@@ -115,7 +114,7 @@ class APIManager {
     }
   }
 
-  // Make API request with automatic fallback
+  // Make API request to stable production URL
   async request(endpoint, options = {}) {
     const url = this.getCurrentURL();
     const fullUrl = `${url}${endpoint}`;
@@ -142,14 +141,6 @@ class APIManager {
       
     } catch (error) {
       console.error(`❌ API Error: ${options.method || 'GET'} ${fullUrl} - ${error.message}`);
-      
-      // If this is not the first URL, try the next one
-      if (this.currentUrlIndex < this.fallbackUrls.length - 1) {
-        console.log('🔄 Trying next API endpoint...');
-        this.currentUrlIndex++;
-        return this.request(endpoint, options);
-      }
-      
       throw error;
     }
   }

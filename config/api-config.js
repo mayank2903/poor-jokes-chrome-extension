@@ -2,22 +2,19 @@
 // Update this file when deploying to get the latest URL everywhere
 
 const API_CONFIG = {
-  // Current production API URL - update this when deploying
-  PRODUCTION_URL: 'https://poor-jokes-newtab-jb3sv9tr7-mayanks-projects-72f678fa.vercel.app/api',
+  // Stable production API URL - this never changes!
+  PRODUCTION_URL: 'https://poor-jokes-newtab.vercel.app/api',
   
-  // Fallback URLs for API manager (in case primary fails)
+  // Single stable production URL - no fallbacks needed
   FALLBACK_URLS: [
-    'https://poor-jokes-newtab-jb3sv9tr7-mayanks-projects-72f678fa.vercel.app/api', // Latest
-    'https://poor-jokes-newtab-hqqdanftc-mayanks-projects-72f678fa.vercel.app/api',
-    'https://poor-jokes-newtab-hslkg05hk-mayanks-projects-72f678fa.vercel.app/api',
-    'https://poor-jokes-newtab-hos0vxjqo-mayanks-projects-72f678fa.vercel.app/api'
+    'https://poor-jokes-newtab.vercel.app/api' // Only stable production URL
   ],
   
   // Admin dashboard URL
-  ADMIN_URL: 'https://poor-jokes-newtab-jb3sv9tr7-mayanks-projects-72f678fa.vercel.app/admin-local.html',
+  ADMIN_URL: 'https://poor-jokes-newtab.vercel.app/admin-local.html',
   
   // Base URL (without /api)
-  BASE_URL: 'https://poor-jokes-newtab-jb3sv9tr7-mayanks-projects-72f678fa.vercel.app',
+  BASE_URL: 'https://poor-jokes-newtab.vercel.app',
   
   // Environment detection
   getCurrentUrl: function() {

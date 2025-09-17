@@ -6,14 +6,20 @@
   "scripts": {
     "dev": "vercel dev",
     "build": "echo 'No build needed'",
-    "deploy": "node scripts/deploy.js",
+    "deploy": "node scripts/deploy-with-tests.js",
     "deploy:simple": "vercel --prod",
     "local": "node local-server.js",
     "test": "npm run local",
     "test:api": "node tests/api-test.js",
-    "test:all": "npm run test:api",
-    "health": "node -e \"fetch(process.env.API_URL || 'https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app/api/jokes').then(r => r.json()).then(d => console.log('Health:', d.success ? 'OK' : 'FAIL')).catch(e => console.log('Health: FAIL -', e.message))\"",
-    "package:store": "node scripts/package-for-store.js",
+    "test:integration": "npm run test:urls && npm run test:extension && npm run test:config && npm run test:extension-urls",
+    "test:urls": "node test-url-behavior.js",
+    "test:extension": "node test-extension.js",
+    "test:config": "node test-config-validation.js",
+    "test:extension-urls": "node test-extension-urls.js",
+    "test:all": "npm run test:integration",
+    "pre-commit": "npm run test:integration",
+    "health": "node -e \"fetch('https://poor-jokes-newtab.vercel.app/api/jokes').then(r => r.json()).then(d => console.log('Health:', d.success ? 'OK' : 'FAIL')).catch(e => console.log('Health: FAIL -', e.message))\"",
+    "package:store": "npm run test:integration && node scripts/package-for-store.js",
     "store:prepare": "npm run package:store",
     "generate:icons": "node scripts/generate-icons.js",
     "icons:web": "open store-assets/icon-generator.html",
@@ -23,7 +29,8 @@
     "@supabase/supabase-js": "^2.38.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "vercel": "^32.0.0"

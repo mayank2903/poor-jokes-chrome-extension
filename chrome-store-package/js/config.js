@@ -10,7 +10,7 @@ class APIConfig {
         cacheBust: true
       },
       production: {
-        baseUrl: 'https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app/api',
+        baseUrl: 'https://poor-jokes-newtab.vercel.app/api',
         version: '1.0.0',
         cacheBust: false
       }

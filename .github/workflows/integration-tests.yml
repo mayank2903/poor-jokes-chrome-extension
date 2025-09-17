@@ -1,0 +1,145 @@
+name: Integration Tests & Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Run URL Behavior Tests
+      run: node test-url-behavior.js
+      
+    - name: Run Extension Tests
+      run: node test-extension.js
+      
+    - name: Test API Endpoints
+      run: |
+        echo "Testing stable production URL..."
+        curl -f "https://poor-jokes-newtab.vercel.app/api/jokes" || exit 1
+        echo "✅ Jokes API working"
+        
+        echo "Testing rate API..."
+        curl -f -X POST "https://poor-jokes-newtab.vercel.app/api/rate" \
+          -H "Content-Type: application/json" \
+          -d '{"joke_id":"test","user_id":"test","rating":1}' || echo "⚠️ Rate API test (expected to fail with test data)"
+        
+        echo "Testing submissions API..."
+        curl -f "https://poor-jokes-newtab.vercel.app/api/submissions?status=pending" \
+          -H "x-admin-password: PoorJokes2024!Admin" || exit 1
+        echo "✅ Submissions API working"
+        
+    - name: Test Extension Files
+      run: |
+        echo "Checking required extension files..."
+        test -f chrome-store-package/manifest.json || exit 1
+        test -f chrome-store-package/newtab.html || exit 1
+        test -f chrome-store-package/newtab-v2.js || exit 1
+        test -f chrome-store-package/styles.css || exit 1
+        test -f chrome-store-package/js/config.js || exit 1
+        test -f chrome-store-package/js/api-manager.js || exit 1
+        echo "✅ All required files present"
+        
+    - name: Validate Manifest
+      run: |
+        echo "Validating manifest.json..."
+        node -e "
+          const manifest = JSON.parse(require('fs').readFileSync('chrome-store-package/manifest.json', 'utf8'));
+          if (!manifest.name || !manifest.version || !manifest.manifest_version) {
+            console.error('❌ Invalid manifest structure');
+            process.exit(1);
+          }
+          if (manifest.version !== '1.0.1') {
+            console.error('❌ Version should be 1.0.1');
+            process.exit(1);
+          }
+          console.log('✅ Manifest validation passed');
+        "
+        
+    - name: Test Stable URL Configuration
+      run: |
+        echo "Testing stable URL configuration..."
+        node -e "
+          const config = require('./chrome-store-package/js/config.js');
+          const fs = require('fs');
+          const configCode = fs.readFileSync('chrome-store-package/js/config.js', 'utf8');
+          
+          if (!configCode.includes('https://poor-jokes-newtab.vercel.app/api')) {
+            console.error('❌ Stable URL not found in config');
+            process.exit(1);
+          }
+          
+          if (configCode.includes('poor-jokes-newtab-') && configCode.includes('mayanks-projects-72f678fa.vercel.app')) {
+            console.error('❌ Old deployment URLs found in config');
+            process.exit(1);
+          }
+          
+          console.log('✅ Stable URL configuration correct');
+        "
+        
+    - name: Test API Manager
+      run: |
+        echo "Testing API Manager configuration..."
+        node -e "
+          const fs = require('fs');
+          const apiManagerCode = fs.readFileSync('chrome-store-package/js/api-manager.js', 'utf8');
+          
+          if (!apiManagerCode.includes('https://poor-jokes-newtab.vercel.app/api')) {
+            console.error('❌ Stable URL not found in API Manager');
+            process.exit(1);
+          }
+          
+          // Check that fallback array has only one URL
+          const fallbackMatch = apiManagerCode.match(/fallbackUrls.*?\[(.*?)\]/s);
+          if (fallbackMatch) {
+            const urls = fallbackMatch[1].split(',').length;
+            if (urls > 1) {
+              console.error('❌ Multiple fallback URLs found - should only use stable URL');
+              process.exit(1);
+            }
+          }
+          
+          console.log('✅ API Manager configuration correct');
+        "
+
+  deploy:
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to Vercel
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.ORG_ID }}
+        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        vercel-args: '--prod'
+        
+    - name: Test Post-Deployment
+      run: |
+        echo "Waiting for deployment to be ready..."
+        sleep 30
+        
+        echo "Testing deployed API..."
+        curl -f "https://poor-jokes-newtab.vercel.app/api/jokes" || exit 1
+        echo "✅ Post-deployment test passed"

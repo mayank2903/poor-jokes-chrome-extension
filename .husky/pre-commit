@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit integration tests..."
+
+# Run integration tests before commit
+npm run test:integration
+
+if [ $? -ne 0 ]; then
+  echo "❌ Integration tests failed. Commit aborted."
+  echo "💡 Fix the issues above and try again."
+  exit 1
+fi
+
+echo "✅ All tests passed. Proceeding with commit."

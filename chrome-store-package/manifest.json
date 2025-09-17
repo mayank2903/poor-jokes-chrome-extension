@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Joor Pokes",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Transform your new tab into a laughter-filled experience with poor jokes, ratings, and community submissions!",
-  "permissions": [],
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
   "host_permissions": [
-    "https://poor-jokes-newtab-6ewxclhxr-mayanks-projects-72f678fa.vercel.app/*",
-    "https://poor-jokes-newtab-ch7te6lzr-mayanks-projects-72f678fa.vercel.app/*",
-    "https://poor-jokes-newtab-6yax4u0s4-mayanks-projects-72f678fa.vercel.app/*",
-    "https://poor-jokes-newtab-kcr9acwtg-mayanks-projects-72f678fa.vercel.app/*"
+    "https://poor-jokes-newtab.vercel.app/*"
   ],
   "chrome_url_overrides": {
     "newtab": "newtab.html"
@@ -29,7 +29,7 @@
     }
   ],
   "author": "Poor Jokes Team",
-  "homepage_url": "https://poor-jokes-newtab-h84vfdbd2-mayanks-projects-72f678fa.vercel.app",
+  "homepage_url": "https://poor-jokes-newtab.vercel.app",
   "short_name": "Joor Pokes",
   "minimum_chrome_version": "88"
 }
