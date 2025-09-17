@@ -4,6 +4,12 @@
   "version": "1.0.0",
   "description": "Transform your new tab into a laughter-filled experience with poor jokes, ratings, and community submissions!",
   "permissions": [],
+  "host_permissions": [
+    "https://poor-jokes-newtab-6ewxclhxr-mayanks-projects-72f678fa.vercel.app/*",
+    "https://poor-jokes-newtab-ch7te6lzr-mayanks-projects-72f678fa.vercel.app/*",
+    "https://poor-jokes-newtab-6yax4u0s4-mayanks-projects-72f678fa.vercel.app/*",
+    "https://poor-jokes-newtab-kcr9acwtg-mayanks-projects-72f678fa.vercel.app/*"
+  ],
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },

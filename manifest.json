@@ -7,6 +7,12 @@
   "author": "Poor Jokes Team",
   "homepage_url": "https://poor-jokes-newtab-7huqmp0n7-mayanks-projects-72f678fa.vercel.app",
   "permissions": [],
+  "host_permissions": [
+    "https://poor-jokes-newtab-6ewxclhxr-mayanks-projects-72f678fa.vercel.app/*",
+    "https://poor-jokes-newtab-ch7te6lzr-mayanks-projects-72f678fa.vercel.app/*",
+    "https://poor-jokes-newtab-6yax4u0s4-mayanks-projects-72f678fa.vercel.app/*",
+    "https://poor-jokes-newtab-kcr9acwtg-mayanks-projects-72f678fa.vercel.app/*"
+  ],
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
