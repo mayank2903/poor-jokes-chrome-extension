@@ -17,6 +17,8 @@
     "test:config": "node test-config-validation.js",
     "test:extension-urls": "node test-extension-urls.js",
     "test:all": "npm run test:integration",
+    "test:daily-jokes": "node test-daily-jokes.js",
+    "test:telegram-jokes": "node test-telegram-jokes.js",
     "validate:urls": "node scripts/validate-urls.js",
     "pre-commit": "npm run validate:urls && npm run test:integration",
     "health": "node -e \"fetch('https://poor-jokes-newtab.vercel.app/api/jokes').then(r => r.json()).then(d => console.log('Health:', d.success ? 'OK' : 'FAIL')).catch(e => console.log('Health: FAIL -', e.message))\"",
