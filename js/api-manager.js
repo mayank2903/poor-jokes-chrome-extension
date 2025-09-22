@@ -5,7 +5,7 @@ class APIManager {
   constructor() {
     this.config = window.APIConfig;
     this.healthCheckInterval = null;
-    this.fallbackUrls = this.config.FALLBACK_URLS;
+    this.fallbackUrls = this.config.FALLBACK_URLS || [this.config.getBaseURL()];
     this.currentUrlIndex = 0;
     this.isHealthy = true;
     this.lastHealthCheck = null;
@@ -65,6 +65,7 @@ class APIManager {
   // Find the best working API URL
   async findBestAPI() {
     console.log('🔍 Finding best API endpoint...');
+    console.log('📋 Available fallback URLs:', this.fallbackUrls);
     
     // Check if fallbackUrls exists
     if (!this.fallbackUrls || this.fallbackUrls.length === 0) {

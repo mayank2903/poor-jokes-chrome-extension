@@ -22,6 +22,10 @@ let currentJoke = null;
 let allJokes = [];
 let userRatings = JSON.parse(localStorage.getItem('userRatings') || '{}');
 
+// Repeat prevention system
+let displayHistory = JSON.parse(localStorage.getItem('poorJokes_displayHistory') || '[]');
+let lastJokeId = null;
+
 // Generate a simple user ID for this browser
 const userId = localStorage.getItem('userId') || generateUserId();
 if (!localStorage.getItem('userId')) {
@@ -62,14 +66,65 @@ async function loadJokes() {
 function showRandomJoke() {
   if (allJokes.length === 0) return;
   
-  const randomIndex = Math.floor(Math.random() * allJokes.length);
-  currentJoke = allJokes[randomIndex];
-  jokeEl.textContent = currentJoke.content;
-  updateRatingDisplay();
+  // Get available jokes (not shown recently)
+  const availableJokes = getAvailableJokes();
+  
+  if (availableJokes.length === 0) {
+    // All jokes have been shown recently, reset history and start fresh
+    console.log('🔄 All jokes shown recently, resetting display history');
+    displayHistory = [];
+    localStorage.setItem('poorJokes_displayHistory', JSON.stringify(displayHistory));
+    
+    // Try again with all jokes available
+    const allAvailableJokes = allJokes.filter(joke => joke.id !== lastJokeId);
+    if (allAvailableJokes.length > 0) {
+      const randomIndex = Math.floor(Math.random() * allAvailableJokes.length);
+      showJoke(allAvailableJokes[randomIndex]);
+    } else {
+      // Only one joke available, show it
+      showJoke(allJokes[0]);
+    }
+    return;
+  }
+  
+  // Select random joke from available ones
+  const randomIndex = Math.floor(Math.random() * availableJokes.length);
+  showJoke(availableJokes[randomIndex]);
+}
+
+// Get jokes that haven't been shown recently
+function getAvailableJokes() {
+  // Filter out jokes that have been shown in the last 10 displays
+  const recentJokeIds = displayHistory.slice(-10);
+  return allJokes.filter(joke => !recentJokeIds.includes(joke.id));
 }
 
 function showJoke(joke) {
   currentJoke = joke;
+  
+  // Track this joke in display history
+  if (joke && joke.id) {
+    // Remove any existing entry for this joke to avoid duplicates
+    displayHistory = displayHistory.filter(id => id !== joke.id);
+    
+    // Add to end of history
+    displayHistory.push(joke.id);
+    
+    // Keep only last 20 entries to prevent localStorage from growing too large
+    if (displayHistory.length > 20) {
+      displayHistory = displayHistory.slice(-20);
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('poorJokes_displayHistory', JSON.stringify(displayHistory));
+    
+    // Update last joke ID
+    lastJokeId = joke.id;
+    
+    console.log('📝 Added joke to display history:', joke.id);
+    console.log('📊 Display history length:', displayHistory.length);
+  }
+  
   jokeEl.textContent = joke.content;
   updateRatingDisplay();
 }

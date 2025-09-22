@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Fix Test</title>
+</head>
+<body>
+    <h1>API Fix Test</h1>
+    <div id="status">Testing...</div>
+    <div id="logs"></div>
+
+    <script src="config/urls.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api-manager.js"></script>
+    
+    <script>
+        function log(message) {
+            const logs = document.getElementById('logs');
+            logs.innerHTML += '<div>' + new Date().toISOString() + ': ' + message + '</div>';
+            console.log(message);
+        }
+
+        async function testAPI() {
+            log('🚀 Starting API test...');
+            
+            // Check if APIConfig is loaded
+            if (typeof window.APIConfig === 'undefined') {
+                log('❌ APIConfig not loaded');
+                return;
+            }
+            
+            log('✅ APIConfig loaded: ' + JSON.stringify(window.APIConfig.getInfo()));
+            
+            // Check if APIManager is loaded
+            if (typeof window.APIManager === 'undefined') {
+                log('❌ APIManager not loaded');
+                return;
+            }
+            
+            log('✅ APIManager loaded');
+            log('📋 Fallback URLs: ' + JSON.stringify(window.APIManager.fallbackUrls));
+            
+            // Test API health
+            try {
+                log('🏥 Testing API health...');
+                const health = await window.APIManager.checkHealth();
+                log('🏥 Health check result: ' + JSON.stringify(health));
+                
+                if (health.healthy) {
+                    log('✅ API is healthy!');
+                    document.getElementById('status').innerHTML = '✅ API is working correctly!';
+                } else {
+                    log('❌ API is unhealthy');
+                    document.getElementById('status').innerHTML = '❌ API is unhealthy';
+                }
+            } catch (error) {
+                log('❌ Health check failed: ' + error.message);
+                document.getElementById('status').innerHTML = '❌ Health check failed: ' + error.message;
+            }
+            
+            // Test API request
+            try {
+                log('🌐 Testing API request...');
+                const data = await window.APIManager.request('/jokes');
+                log('✅ API request successful: ' + data.jokes.length + ' jokes loaded');
+                document.getElementById('status').innerHTML = '✅ API is working! Loaded ' + data.jokes.length + ' jokes';
+            } catch (error) {
+                log('❌ API request failed: ' + error.message);
+                document.getElementById('status').innerHTML = '❌ API request failed: ' + error.message;
+            }
+        }
+
+        // Run test when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(testAPI, 1000); // Wait for API Manager to initialize
+        });
+    </script>
+</body>
+</html>
