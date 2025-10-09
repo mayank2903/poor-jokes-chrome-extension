@@ -22,6 +22,8 @@ let currentJoke = null;
 let allJokes = [];
 let userRatings = JSON.parse(localStorage.getItem('userRatings') || '{}');
 let userId = localStorage.getItem('userId') || generateUserId();
+let lastJokesLoad = 0;
+const JOKES_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // Repeat prevention system
 let displayHistory = JSON.parse(localStorage.getItem('poorJokes_displayHistory') || '[]');
@@ -59,6 +61,7 @@ async function loadJokes() {
     
     if (data.success && data.jokes && data.jokes.length > 0) {
       allJokes = data.jokes;
+      lastJokesLoad = Date.now();
       // Don't automatically change the joke - just update the available jokes
       console.log('✅ Loaded jokes from API (background)');
     } else {
@@ -75,6 +78,15 @@ async function loadJokes() {
     if (jokeEl) {
       jokeEl.textContent = 'Sorry, no jokes available right now. Please try again later.';
     }
+  }
+}
+
+// Check if jokes need refresh and reload if necessary
+async function checkAndRefreshJokes() {
+  const now = Date.now();
+  if (now - lastJokesLoad > JOKES_REFRESH_INTERVAL) {
+    console.log('🔄 Refreshing jokes (older than 5 minutes)');
+    await loadJokes();
   }
 }
 
@@ -392,7 +404,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Set up event listeners after DOM is loaded
   if (nextJokeBtn) {
-    nextJokeBtn.addEventListener('click', showRandomJoke);
+    nextJokeBtn.addEventListener('click', () => {
+      // Check if we need to refresh jokes before showing next
+      checkAndRefreshJokes().then(() => {
+        showRandomJoke();
+      });
+    });
     console.log('Added event listener to nextJokeBtn');
   }
   
