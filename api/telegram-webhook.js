@@ -88,6 +88,11 @@ async function handleTelegramUpdate(req, res) {
     return res.status(200).json({ ok: true, duplicate: true });
   }
 
+  // Mark as processed immediately to prevent concurrent retries from re-triggering while we work
+  if (typeof updateId !== 'undefined') {
+    rememberUpdateId(updateId);
+  }
+
   // Handle callback query (button clicks)
   if (update.callback_query) {
     await handleCallbackQuery(update.callback_query);
@@ -96,10 +101,6 @@ async function handleTelegramUpdate(req, res) {
   // Handle regular messages
   if (update.message) {
     await handleMessage(update.message);
-  }
-
-  if (typeof updateId !== 'undefined') {
-    rememberUpdateId(updateId);
   }
 
   return res.status(200).json({ ok: true });
