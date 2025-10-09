@@ -337,8 +337,26 @@ async function handleMessage(message) {
   
   // Handle /jokes command
   else if (text === '/jokes') {
-    await generateJokesOnDemand(chat.id);
-    console.log(`User ${chat.id} requested jokes`);
+    // Prevent concurrent generations per chat; run async to avoid Telegram retries
+    if (!globalThis.__activeJokesGenerationChats) {
+      globalThis.__activeJokesGenerationChats = new Set();
+    }
+    const active = globalThis.__activeJokesGenerationChats;
+
+    if (active.has(chat.id)) {
+      await sendTelegramMessage(chat.id, '⏳ Already generating jokes for you. Please wait a moment.');
+      return;
+    }
+
+    active.add(chat.id);
+
+    generateJokesOnDemand(chat.id)
+      .catch(err => console.error('Async generateJokesOnDemand error:', err))
+      .finally(() => {
+        try { active.delete(chat.id); } catch (_) {}
+      });
+
+    console.log(`User ${chat.id} requested jokes (async started)`);
   }
   
   // Handle /worst or /worst5 command - show most downvoted jokes
@@ -433,12 +451,14 @@ async function generateJokesOnDemand(chatId) {
       return;
     }
 
-    // Generate and send jokes one at a time
+    // Generate and send jokes one at a time with overall timeout
     let submittedCount = 0;
     let attempts = 0;
     const maxAttempts = 40; // Increased to ensure we get 10 unique jokes
+    const start = Date.now();
+    const HARD_TIMEOUT_MS = 45_000; // Stop after 45s and send what we have
     
-    while (submittedCount < 10 && attempts < maxAttempts) {
+    while (submittedCount < 10 && attempts < maxAttempts && (Date.now() - start) < HARD_TIMEOUT_MS) {
       attempts++;
       
       // Generate a single joke
