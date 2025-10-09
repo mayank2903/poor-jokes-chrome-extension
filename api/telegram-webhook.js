@@ -439,6 +439,32 @@ async function generateJokesOnDemand(chatId) {
         console.log(`🚫 Duplicate found: "${joke.content.substring(0, 50)}..." - trying again`);
         continue;
       }
+
+      // Do not repeat previously rejected jokes or already approved jokes
+      try {
+        // Check against existing approved jokes (main table)
+        const { data: existingSame, error: existingErr } = await supabase
+          .from('jokes')
+          .select('id, content')
+          .ilike('content', joke.content);
+        if (!existingErr && existingSame && existingSame.length > 0) {
+          console.log('Joke already exists in jokes table, skipping');
+          continue;
+        }
+
+        // Check against previously rejected submissions
+        const { data: rejectedSame, error: rejectedErr } = await supabase
+          .from('joke_submissions')
+          .select('id, content, status')
+          .eq('status', 'rejected')
+          .ilike('content', joke.content);
+        if (!rejectedErr && rejectedSame && rejectedSame.length > 0) {
+          console.log('Joke was previously rejected, skipping');
+          continue;
+        }
+      } catch (checkErr) {
+        console.warn('Error checking repeats/rejections, proceeding cautiously:', checkErr.message);
+      }
       
       try {
         // Submit to database
