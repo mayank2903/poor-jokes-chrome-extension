@@ -337,8 +337,27 @@ async function handleMessage(message) {
   
   // Handle /jokes command
   else if (text === '/jokes') {
-    await generateJokesOnDemand(chat.id);
-    console.log(`User ${chat.id} requested jokes`);
+    // Prevent concurrent generations per chat
+    if (!globalThis.__activeJokesGenerationChats) {
+      globalThis.__activeJokesGenerationChats = new Set();
+    }
+    const active = globalThis.__activeJokesGenerationChats;
+
+    if (active.has(chat.id)) {
+      await sendTelegramMessage(chat.id, '⏳ Already generating jokes for you. Please wait a moment.');
+      return;
+    }
+
+    active.add(chat.id);
+
+    // Kick off generation without blocking webhook response
+    generateJokesOnDemand(chat.id)
+      .catch(err => console.error('Async generateJokesOnDemand error:', err))
+      .finally(() => {
+        try { active.delete(chat.id); } catch (_) {}
+      });
+
+    console.log(`User ${chat.id} requested jokes (async started)`);
   }
   
   // Handle /worst or /worst5 command - show most downvoted jokes
@@ -421,7 +440,7 @@ async function generateJokesOnDemand(chatId) {
     }
 
     // Send initial message
-    await sendTelegramMessage(chatId, '🎭 Generating 10 new puns for you...\n⏳ Please wait while I create some clever wordplay!');
+    await sendTelegramMessage(chatId, '🎭 Generating 10 new puns for you...');
 
     const generator = new JokeGenerator();
     const jokes = await generator.generateDailyJokes();
@@ -513,8 +532,8 @@ async function generateJokesOnDemand(chatId) {
         
         console.log(`✅ Submitted joke ${submittedCount}/5: ${joke.content.substring(0, 50)}...`);
         
-        // Small delay between jokes
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Small delay between jokes to avoid flooding
+        await new Promise(resolve => setTimeout(resolve, 300));
         
       } catch (error) {
         console.error('Error processing joke:', error);
