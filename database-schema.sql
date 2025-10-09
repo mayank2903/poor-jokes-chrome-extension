@@ -92,3 +92,11 @@ CREATE POLICY "Allow public insert to joke ratings" ON joke_ratings
 
 CREATE POLICY "Allow public update of own joke ratings" ON joke_ratings
   FOR UPDATE USING (true);
+
+-- Cross-instance lock to prevent duplicate /jokes generations per chat
+CREATE TABLE IF NOT EXISTS generation_locks (
+  chat_id TEXT PRIMARY KEY,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_generation_locks_expires_at ON generation_locks(expires_at);
