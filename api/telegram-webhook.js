@@ -335,28 +335,10 @@ async function handleMessage(message) {
     console.log(`User ${chat.id} requested help`);
   }
   
-  // Handle /jokes command
+  // Handle /jokes command (synchronous)
   else if (text === '/jokes') {
-    // In-memory per-chat guard only
-    if (!globalThis.__activeJokesGenerationChats) {
-      globalThis.__activeJokesGenerationChats = new Set();
-    }
-    const active = globalThis.__activeJokesGenerationChats;
-
-    if (active.has(chat.id)) {
-      await sendTelegramMessage(chat.id, '⏳ Already generating jokes for you. Please wait a moment.');
-      return;
-    }
-
-    active.add(chat.id);
-
-    generateJokesOnDemand(chat.id)
-      .catch(err => console.error('Async generateJokesOnDemand error:', err))
-      .finally(() => {
-        try { active.delete(chat.id); } catch (_) {}
-      });
-
-    console.log(`User ${chat.id} requested jokes (async started)`);
+    await generateJokesOnDemand(chat.id);
+    console.log(`User ${chat.id} requested jokes (sync run finished)`);
   }
   
   // Handle /worst or /worst5 command - show most downvoted jokes
