@@ -363,7 +363,7 @@ async function sendHelpMessage(chatId) {
   const message = `🤖 *Poor Jokes Bot Help*
 
 *Commands:*
-• /jokes - Generate 5 new AI-powered puns
+• /jokes - Generate 10 new AI-powered puns
 • /worst - Show 5 most downvoted jokes
 • /help - Show this help message
 • /start - Welcome message
@@ -398,7 +398,7 @@ async function generateJokesOnDemand(chatId) {
     }
 
     // Send initial message
-    await sendTelegramMessage(chatId, '🎭 Generating 5 new puns for you...\n⏳ Please wait while I create some clever wordplay!');
+    await sendTelegramMessage(chatId, '🎭 Generating 10 new puns for you...\n⏳ Please wait while I create some clever wordplay!');
 
     const generator = new JokeGenerator();
     const jokes = await generator.generateDailyJokes();
@@ -413,9 +413,9 @@ async function generateJokesOnDemand(chatId) {
     // Generate and send jokes one at a time
     let submittedCount = 0;
     let attempts = 0;
-    const maxAttempts = 20; // Increased to ensure we get 5 unique jokes
+    const maxAttempts = 40; // Increased to ensure we get 10 unique jokes
     
-    while (submittedCount < 5 && attempts < maxAttempts) {
+    while (submittedCount < 10 && attempts < maxAttempts) {
       attempts++;
       
       // Generate a single joke
