@@ -99,38 +99,72 @@ async function handleCallbackQuery(callbackQuery) {
     }
 
     // Parse callback data
-    const [action, submissionId] = data.split('_');
+    const [action, identifier] = data.split('_');
     
-    if (!submissionId) {
-      await answerCallbackQuery(id, 'Invalid submission ID', true);
+    // Handle approve/reject submission actions
+    if (action === 'approve' || action === 'reject') {
+      if (!identifier) {
+        await answerCallbackQuery(id, 'Invalid submission ID', true);
+        return;
+      }
+
+      // Get submission from database
+      const { data: submission, error: fetchError } = await supabase
+        .from('joke_submissions')
+        .select('*')
+        .eq('id', identifier)
+        .single();
+
+      if (fetchError || !submission) {
+        await answerCallbackQuery(id, 'Submission not found', true);
+        return;
+      }
+
+      if (submission.status !== 'pending') {
+        await answerCallbackQuery(id, 'Submission already reviewed', true);
+        return;
+      }
+
+      if (action === 'approve') {
+        await handleApproveSubmission(identifier, submission, id, chatId, messageId);
+      } else {
+        await handleRejectSubmission(identifier, submission, id, chatId, messageId);
+      }
       return;
     }
 
-    // Get submission from database
-    const { data: submission, error: fetchError } = await supabase
-      .from('joke_submissions')
-      .select('*')
-      .eq('id', submissionId)
-      .single();
+    // Handle delete joke action from /worst list
+    if (action === 'deletejoke') {
+      const jokeId = identifier;
+      if (!jokeId) {
+        await answerCallbackQuery(id, 'Invalid joke ID', true);
+        return;
+      }
 
-    if (fetchError || !submission) {
-      await answerCallbackQuery(id, 'Submission not found', true);
+      try {
+        // Delete ratings first to avoid FK constraints
+        await supabase.from('joke_ratings').delete().eq('joke_id', jokeId);
+
+        // Delete the joke
+        const { error: deleteJokeError } = await supabase
+          .from('jokes')
+          .delete()
+          .eq('id', jokeId);
+
+        if (deleteJokeError) {
+          throw deleteJokeError;
+        }
+
+        await answerCallbackQuery(id, `Joke ${jokeId} deleted`);
+
+        // Update the message to reflect deletion
+        const updated = `🗑️ Joke deleted (ID: \`${jokeId}\`)`;
+        await editMessage(chatId, messageId, updated);
+      } catch (err) {
+        console.error('Error deleting joke:', err);
+        await answerCallbackQuery(id, 'Failed to delete joke', true);
+      }
       return;
-    }
-
-    if (submission.status !== 'pending') {
-      await answerCallbackQuery(id, 'Submission already reviewed', true);
-      return;
-    }
-
-    // Handle approve action
-    if (action === 'approve') {
-      await handleApproveSubmission(submissionId, submission, id, chatId, messageId);
-    }
-    
-    // Handle reject action
-    else if (action === 'reject') {
-      await handleRejectSubmission(submissionId, submission, id, chatId, messageId);
     }
 
   } catch (error) {
@@ -513,18 +547,52 @@ async function sendMostDownvotedJokes(chatId, limit = 5) {
     // Build a lookup for content
     const jokeById = new Map(jokes.map(j => [j.id, j]));
 
-    // Format the message
-    const lines = [];
-    lines.push('📉 *Most Downvoted Jokes*');
-    lines.push('');
-    topEntries.forEach(([jokeId, count], idx) => {
+    // Send one message per joke with a Delete button
+    for (let i = 0; i < topEntries.length; i++) {
+      const [jokeId, count] = topEntries[i];
       const joke = jokeById.get(jokeId);
       const text = joke && joke.content ? joke.content : '(content not found)';
-      lines.push(`${idx + 1}. (${count} 👎)\n"${text}"`);
-      if (idx < topEntries.length - 1) lines.push('');
-    });
 
-    await sendTelegramMessage(chatId, lines.join('\n'));
+      const message = `📉 *Downvoted Joke #${i + 1}*\n\n👎 Downvotes: ${count}\n\n📝\n"${text}"\n\nID: \`${jokeId}\``;
+
+      // Dynamic import for node-fetch
+      let fetch;
+      try {
+        const fetchModule = await import('node-fetch');
+        fetch = fetchModule.default;
+      } catch (error) {
+        if (typeof globalThis.fetch !== 'undefined') {
+          fetch = globalThis.fetch;
+        } else {
+          throw new Error('Fetch not available');
+        }
+      }
+
+      const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+      if (!TELEGRAM_BOT_TOKEN) {
+        await sendTelegramMessage(chatId, message);
+        continue;
+      }
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '🗑️ Delete', callback_data: `deletejoke_${jokeId}` }
+          ]
+        ]
+      };
+
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        })
+      });
+    }
   } catch (error) {
     console.error('Error sending most downvoted jokes:', error);
     await sendTelegramMessage(chatId, '❌ Failed to fetch downvoted jokes. Please try again later.');
