@@ -283,6 +283,18 @@ async function handleMessage(message) {
     await generateJokesOnDemand(chat.id);
     console.log(`User ${chat.id} requested jokes`);
   }
+  
+  // Handle /worst or /worst5 command - show most downvoted jokes
+  else if (text === '/worst' || text === '/worst5') {
+    await sendMostDownvotedJokes(chat.id, 5);
+    console.log(`User ${chat.id} requested most downvoted jokes`);
+  }
+  
+  // Handle /downvoted command (alias)
+  else if (text === '/downvoted') {
+    await sendMostDownvotedJokes(chat.id, 5);
+    console.log(`User ${chat.id} requested most downvoted jokes (alias)`);
+  }
 }
 
 /**
@@ -318,6 +330,7 @@ async function sendHelpMessage(chatId) {
 
 *Commands:*
 • /jokes - Generate 5 new AI-powered puns
+• /worst - Show 5 most downvoted jokes
 • /help - Show this help message
 • /start - Welcome message
 
@@ -439,6 +452,82 @@ Want more puns? Just send /jokes again!`;
   } catch (error) {
     console.error('Error generating jokes on demand:', error);
     await sendTelegramMessage(chatId, '❌ Sorry, there was an error generating puns. Please try again later.');
+  }
+}
+
+/**
+ * Send the most downvoted jokes
+ * @param {string} chatId - Chat ID
+ * @param {number} limit - Number of jokes to show
+ */
+async function sendMostDownvotedJokes(chatId, limit = 5) {
+  try {
+    if (!supabase) {
+      await sendTelegramMessage(chatId, '❌ Database not available. Please check your configuration.');
+      return;
+    }
+
+    // Fetch all downvote ratings (rating = -1)
+    const { data: downvoteRows, error: downvoteError } = await supabase
+      .from('joke_ratings')
+      .select('joke_id, rating')
+      .eq('rating', -1);
+
+    if (downvoteError) {
+      throw downvoteError;
+    }
+
+    if (!downvoteRows || downvoteRows.length === 0) {
+      await sendTelegramMessage(chatId, '👍 No downvotes yet. Your jokes are crushing it!');
+      return;
+    }
+
+    // Aggregate downvotes by joke_id
+    const downvoteCountByJokeId = new Map();
+    for (const row of downvoteRows) {
+      const current = downvoteCountByJokeId.get(row.joke_id) || 0;
+      downvoteCountByJokeId.set(row.joke_id, current + 1);
+    }
+
+    // Sort by downvote count desc, take top N
+    const topEntries = Array.from(downvoteCountByJokeId.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit);
+
+    const topIds = topEntries.map(([jokeId]) => jokeId);
+    if (topIds.length === 0) {
+      await sendTelegramMessage(chatId, '👍 No downvotes yet. Your jokes are crushing it!');
+      return;
+    }
+
+    // Fetch the joke contents
+    const { data: jokes, error: jokesError } = await supabase
+      .from('jokes')
+      .select('id, content')
+      .in('id', topIds);
+
+    if (jokesError) {
+      throw jokesError;
+    }
+
+    // Build a lookup for content
+    const jokeById = new Map(jokes.map(j => [j.id, j]));
+
+    // Format the message
+    const lines = [];
+    lines.push('📉 *Most Downvoted Jokes*');
+    lines.push('');
+    topEntries.forEach(([jokeId, count], idx) => {
+      const joke = jokeById.get(jokeId);
+      const text = joke && joke.content ? joke.content : '(content not found)';
+      lines.push(`${idx + 1}. (${count} 👎)\n"${text}"`);
+      if (idx < topEntries.length - 1) lines.push('');
+    });
+
+    await sendTelegramMessage(chatId, lines.join('\n'));
+  } catch (error) {
+    console.error('Error sending most downvoted jokes:', error);
+    await sendTelegramMessage(chatId, '❌ Failed to fetch downvoted jokes. Please try again later.');
   }
 }
 
