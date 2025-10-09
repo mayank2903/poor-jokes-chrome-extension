@@ -8,6 +8,19 @@ const { answerCallbackQuery, editMessage, sendSubmissionNotification } = require
 const { formatJokeContent, formatSubmitterName, validateJokeQuality } = require('../lib/joke-formatter');
 const JokeGenerator = require('../lib/joke-generator');
 
+// In-memory deduplication of Telegram updates to avoid repeated command processing
+const processedUpdateIds = new Set();
+const MAX_PROCESSED_IDS = 1000;
+
+function rememberUpdateId(id) {
+  processedUpdateIds.add(id);
+  if (processedUpdateIds.size > MAX_PROCESSED_IDS) {
+    const ids = Array.from(processedUpdateIds).slice(-MAX_PROCESSED_IDS);
+    processedUpdateIds.clear();
+    ids.forEach(x => processedUpdateIds.add(x));
+  }
+}
+
 // Initialize Supabase client with error handling
 let supabase = null;
 try {
@@ -68,6 +81,12 @@ async function handler(req, res) {
  */
 async function handleTelegramUpdate(req, res) {
   const update = req.body;
+  const updateId = update && update.update_id;
+
+  // Avoid re-processing duplicate updates retried by Telegram
+  if (typeof updateId !== 'undefined' && processedUpdateIds.has(updateId)) {
+    return res.status(200).json({ ok: true, duplicate: true });
+  }
 
   // Handle callback query (button clicks)
   if (update.callback_query) {
@@ -77,6 +96,10 @@ async function handleTelegramUpdate(req, res) {
   // Handle regular messages
   if (update.message) {
     await handleMessage(update.message);
+  }
+
+  if (typeof updateId !== 'undefined') {
+    rememberUpdateId(updateId);
   }
 
   return res.status(200).json({ ok: true });
