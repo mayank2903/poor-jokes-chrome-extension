@@ -337,27 +337,8 @@ async function handleMessage(message) {
   
   // Handle /jokes command
   else if (text === '/jokes') {
-    // Prevent concurrent generations per chat
-    if (!globalThis.__activeJokesGenerationChats) {
-      globalThis.__activeJokesGenerationChats = new Set();
-    }
-    const active = globalThis.__activeJokesGenerationChats;
-
-    if (active.has(chat.id)) {
-      await sendTelegramMessage(chat.id, '⏳ Already generating jokes for you. Please wait a moment.');
-      return;
-    }
-
-    active.add(chat.id);
-
-    // Kick off generation without blocking webhook response
-    generateJokesOnDemand(chat.id)
-      .catch(err => console.error('Async generateJokesOnDemand error:', err))
-      .finally(() => {
-        try { active.delete(chat.id); } catch (_) {}
-      });
-
-    console.log(`User ${chat.id} requested jokes (async started)`);
+    await generateJokesOnDemand(chat.id);
+    console.log(`User ${chat.id} requested jokes`);
   }
   
   // Handle /worst or /worst5 command - show most downvoted jokes
