@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
+const { sendRatingNotification } = require('../lib/telegram-notifications');
 
 // Initialize Supabase clients
 const supabase = createClient(
@@ -54,6 +55,21 @@ async function rateJoke(req, res) {
       return res.status(400).json({ error: 'Rating must be 1 (thumbs up) or -1 (thumbs down)' });
     }
 
+    // Fetch joke content for notifications (non-blocking usage)
+    let jokeContent = undefined;
+    try {
+      const { data: jokeRow } = await supabase
+        .from('jokes')
+        .select('id, content')
+        .eq('id', joke_id)
+        .single();
+      if (jokeRow && jokeRow.content) {
+        jokeContent = jokeRow.content;
+      }
+    } catch (e) {
+      // Ignore content fetch errors; proceed without content
+    }
+
     // Check if user has already rated this joke
     const { data: existingRating, error: fetchError } = await supabaseAdmin
       .from('joke_ratings')
@@ -79,6 +95,9 @@ async function rateJoke(req, res) {
           throw deleteError;
         }
 
+        // Fire-and-forget Telegram notification
+        try { sendRatingNotification({ joke_id, user_id, rating, action: 'removed', content: jokeContent }); } catch (e) {}
+
         return res.status(200).json({
           success: true,
           action: 'removed',
@@ -97,6 +116,9 @@ async function rateJoke(req, res) {
         if (updateError) {
           throw updateError;
         }
+
+        // Fire-and-forget Telegram notification
+        try { sendRatingNotification({ joke_id, user_id, rating, action: 'updated', content: jokeContent }); } catch (e) {}
 
         return res.status(200).json({
           success: true,
@@ -119,6 +141,9 @@ async function rateJoke(req, res) {
       if (insertError) {
         throw insertError;
       }
+
+      // Fire-and-forget Telegram notification
+      try { sendRatingNotification({ joke_id, user_id, rating, action: 'added', content: jokeContent }); } catch (e) {}
 
       return res.status(201).json({
         success: true,
