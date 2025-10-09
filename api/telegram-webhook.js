@@ -21,47 +21,6 @@ function rememberUpdateId(id) {
   }
 }
 
-// Database-backed per-chat generation lock (works across serverless instances)
-async function acquireChatLock(chatId, ttlSeconds = 60) {
-  try {
-    if (!supabase) return false;
-
-    // Cleanup expired locks first
-    const nowIso = new Date().toISOString();
-    await supabase
-      .from('generation_locks')
-      .delete()
-      .lt('expires_at', nowIso);
-
-    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
-    const { error: insertError } = await supabase
-      .from('generation_locks')
-      .insert({ chat_id: String(chatId), expires_at: expiresAt });
-
-    if (insertError) {
-      // Duplicate key or table missing
-      return false;
-    }
-
-    return true;
-  } catch (e) {
-    console.warn('acquireChatLock error:', e.message);
-    return false;
-  }
-}
-
-async function releaseChatLock(chatId) {
-  try {
-    if (!supabase) return;
-    await supabase
-      .from('generation_locks')
-      .delete()
-      .eq('chat_id', String(chatId));
-  } catch (e) {
-    console.warn('releaseChatLock error:', e.message);
-  }
-}
-
 // Initialize Supabase client with error handling
 let supabase = null;
 try {
@@ -378,16 +337,13 @@ async function handleMessage(message) {
   
   // Handle /jokes command
   else if (text === '/jokes') {
-    // Try to acquire a cross-instance lock; if not, fall back to in-memory guard
-    let gotDbLock = await acquireChatLock(chat.id, 90);
-
-    // In-memory fallback (best-effort)
+    // In-memory per-chat guard only
     if (!globalThis.__activeJokesGenerationChats) {
       globalThis.__activeJokesGenerationChats = new Set();
     }
     const active = globalThis.__activeJokesGenerationChats;
 
-    if (!gotDbLock && active.has(chat.id)) {
+    if (active.has(chat.id)) {
       await sendTelegramMessage(chat.id, '⏳ Already generating jokes for you. Please wait a moment.');
       return;
     }
@@ -396,9 +352,8 @@ async function handleMessage(message) {
 
     generateJokesOnDemand(chat.id)
       .catch(err => console.error('Async generateJokesOnDemand error:', err))
-      .finally(async () => {
+      .finally(() => {
         try { active.delete(chat.id); } catch (_) {}
-        try { if (gotDbLock) await releaseChatLock(chat.id); } catch (_) {}
       });
 
     console.log(`User ${chat.id} requested jokes (async started)`);
