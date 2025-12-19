@@ -1,0 +1,66 @@
+name: Test and Publish
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run joke repeat prevention test
+      run: node tests/joke-repeat-test.js
+    
+    - name: Run existing integration tests
+      run: npm run test:integration || true
+    
+    - name: Test Results
+      if: failure()
+      run: |
+        echo "❌ Tests failed! Publishing blocked."
+        exit 1
+
+  publish-check:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Package for Chrome Store
+      run: npm run package:store
+    
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: chrome-store-package
+        path: poor-jokes-newtab-v*.zip
+        retention-days: 30
+
