@@ -4,6 +4,37 @@
  * Fails if more than 10 jokes repeat during the journey
  */
 
+// Import fetch for Node.js
+let fetch;
+if (typeof globalThis.fetch === 'function') {
+  // Use built-in fetch (Node 18+)
+  fetch = globalThis.fetch;
+} else {
+  // Fallback: use http/https modules
+  const https = require('https');
+  const { URL } = require('url');
+  
+  fetch = async (url, options = {}) => {
+    return new Promise((resolve, reject) => {
+      const urlObj = new URL(url);
+      const req = https.request(urlObj, options, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          resolve({
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode,
+            json: async () => JSON.parse(data)
+          });
+        });
+      });
+      
+      req.on('error', reject);
+      req.end();
+    });
+  };
+}
+
 // Mock DOM and localStorage for Node.js environment
 const mockLocalStorage = {
   data: {},
@@ -156,14 +187,49 @@ vm.runInContext(extensionCode, context);
 // Export functions and variables from context for use in tests
 const loadJokes = context.loadJokes;
 const showRandomJoke = context.showRandomJoke;
-const showJoke = context.showJoke;
+const originalShowJoke = context.showJoke;
+
+// Wrap showJoke to track jokes - use a shared object
+const jokeTracker = { allShownJokes: [] };
+const showJoke = (joke) => {
+  if (joke && joke.id) {
+    jokeTracker.allShownJokes.push(joke.id);
+  }
+  return originalShowJoke(joke);
+};
+
+// Fetch actual joke count from database
+async function getActualJokeCount() {
+  try {
+    const API_URL = process.env.API_URL || 'https://poor-jokes-newtab.vercel.app/api/jokes';
+    
+    console.log('📡 Fetching actual joke count from database...');
+    const response = await fetch(`${API_URL}?limit=1&page=1`);
+    const data = await response.json();
+    
+    if (data.success && data.pagination) {
+      const totalJokes = data.pagination.totalJokes || 0;
+      console.log(`✅ Found ${totalJokes} jokes in database`);
+      return totalJokes;
+    } else {
+      console.warn('⚠️  Could not get joke count from API, using default 200');
+      return 200;
+    }
+  } catch (error) {
+    console.warn(`⚠️  Error fetching joke count: ${error.message}, using default 200`);
+    return 200;
+  }
+}
 
 // Test function
 async function testJokeRepeatPrevention() {
   console.log('🧪 Starting joke repeat prevention test...');
   
-  // Initialize with 200 test jokes
-  initializeMockJokes(200);
+  // Get actual joke count from database
+  const actualJokeCount = await getActualJokeCount();
+  
+  // Initialize with actual number of jokes from database
+  initializeMockJokes(actualJokeCount);
   
   // Clear all localStorage
   window.localStorage.clear();
@@ -175,23 +241,10 @@ async function testJokeRepeatPrevention() {
   // Clear all localStorage
   window.localStorage.clear();
   
-  // Track all jokes shown by ID (more reliable than content)
-  const jokesShown = [];
-  const jokeCounts = new Map();
-  let repeatedJokes = 0;
-  let totalJokesShown = 0;
+  // Track all jokes shown - we'll use the allShownJokes array from the wrapped showJoke
+  jokeTracker.allShownJokes = []; // Reset tracking array
   let consecutiveNoJokeCount = 0;
   const MAX_CONSECUTIVE_NO_JOKE = 5;
-  
-  // Helper to get current joke ID from context
-  const getCurrentJokeId = () => {
-    try {
-      // Access currentJoke from the context (it's a global variable in the extension code)
-      return context.currentJoke ? context.currentJoke.id : null;
-    } catch (e) {
-      return null;
-    }
-  };
   
   // Simulate loading jokes
   await loadJokes();
@@ -207,8 +260,6 @@ async function testJokeRepeatPrevention() {
   console.log('🔄 Simulating continuous "another" button clicks...');
   
   while (consecutiveNoJokeCount < MAX_CONSECUTIVE_NO_JOKE) {
-    // Get current joke ID
-    const currentJokeId = getCurrentJokeId();
     const currentText = jokeEl.textContent.trim();
     
     // Check if we've reached the end
@@ -218,41 +269,13 @@ async function testJokeRepeatPrevention() {
       break;
     }
     
-    // Track joke by ID if available
-    if (currentJokeId) {
-      jokesShown.push(currentJokeId);
-      jokeCounts.set(currentJokeId, (jokeCounts.get(currentJokeId) || 0) + 1);
-      
-      const count = jokeCounts.get(currentJokeId);
-      if (count > 1) {
-        repeatedJokes++;
-        const jokeContent = currentText.replace(/\n/g, ' ').substring(0, 50);
-        console.log(`⚠️  Joke repeated (${count} times): ${currentJokeId} - ${jokeContent}...`);
-      }
-      
-      totalJokesShown++;
+    // Check if we have a valid joke displayed
+    if (currentText && 
+        currentText !== 'Loading joke...' &&
+        currentText !== 'No jokes available. Please try again later.' &&
+        currentText !== 'Error loading jokes. Please try again later.' &&
+        !currentText.includes("You've seen all available jokes")) {
       consecutiveNoJokeCount = 0;
-    } else if (currentText && 
-               currentText !== 'Loading joke...' &&
-               currentText !== 'No jokes available. Please try again later.' &&
-               currentText !== 'Error loading jokes. Please try again later.' &&
-               !currentText.includes("You've seen all available jokes")) {
-      // Fallback: track by content if ID not available
-      const jokeContent = currentText.replace(/\n/g, ' ').trim();
-      if (jokeContent) {
-        jokesShown.push(jokeContent);
-        jokeCounts.set(jokeContent, (jokeCounts.get(jokeContent) || 0) + 1);
-        
-        if (jokeCounts.get(jokeContent) > 1) {
-          repeatedJokes++;
-          console.log(`⚠️  Joke repeated (${jokeCounts.get(jokeContent)} times): ${jokeContent.substring(0, 50)}...`);
-        }
-        
-        totalJokesShown++;
-        consecutiveNoJokeCount = 0;
-      } else {
-        consecutiveNoJokeCount++;
-      }
     } else {
       consecutiveNoJokeCount++;
     }
@@ -260,18 +283,35 @@ async function testJokeRepeatPrevention() {
     // Simulate clicking "another" button
     await showRandomJoke();
     
-    // Wait a bit for async operations
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait for async operations to complete
+    await new Promise(resolve => setTimeout(resolve, 150));
     
     // Safety check - don't run forever
-    if (totalJokesShown > 500) {
+    if (jokeTracker.allShownJokes.length > 500) {
       console.log('⚠️  Safety limit reached (500 jokes)');
       break;
     }
   }
   
+  // Now analyze the allShownJokes array
+  const jokeCounts = new Map();
+  jokeTracker.allShownJokes.forEach(jokeId => {
+    jokeCounts.set(jokeId, (jokeCounts.get(jokeId) || 0) + 1);
+  });
+  
+  // Count repeated jokes
+  let repeatedJokes = 0;
+  jokeCounts.forEach((count, jokeId) => {
+    if (count > 1) {
+      repeatedJokes++;
+      console.log(`⚠️  Joke repeated (${count} times): ${jokeId}`);
+    }
+  });
+  
+  const totalJokesShown = jokeTracker.allShownJokes.length;
+  
   // Calculate statistics
-  const uniqueJokes = new Set(jokesShown).size;
+  const uniqueJokes = new Set(jokeTracker.allShownJokes).size;
   const totalRepeats = Array.from(jokeCounts.values())
     .filter(count => count > 1)
     .reduce((sum, count) => sum + (count - 1), 0);
