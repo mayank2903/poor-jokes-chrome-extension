@@ -26,57 +26,115 @@ let lastJokesLoad = 0;
 const JOKES_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // Repeat prevention system
+// Track both display history and when jokes were first seen
 let displayHistory = JSON.parse(localStorage.getItem('poorJokes_displayHistory') || '[]');
+let jokeFirstSeen = JSON.parse(localStorage.getItem('poorJokes_jokeFirstSeen') || '{}');
+// Track all jokes that have been seen (bounded by active joke list)
+let allSeenJokeIds = new Set(JSON.parse(localStorage.getItem('poorJokes_allSeenJokeIds') || '[]'));
 let lastJokeId = null;
+const MAX_DISPLAY_HISTORY = 100; // Increased from 20 to prevent more repeats
+const RECENT_JOKES_TO_AVOID = 50; // Increased from 10 to avoid more recent jokes
 
 // Generate unique user ID
 function generateUserId() {
   return 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 }
 
-// Load jokes from API using APIManager with immediate fallback
+// Load jokes from API with localStorage caching
 async function loadJokes() {
   console.log('loadJokes() called');
   
-  // Show local joke immediately for better UX
-  if (POOR_JOKES && POOR_JOKES.length > 0) {
-    allJokes = POOR_JOKES.map((content, index) => ({
-      id: `local_${index}`,
-      content: content,
-      up_votes: 0,
-      down_votes: 0,
-      total_votes: 0,
-      rating_percentage: 0
-    }));
-    showRandomJoke();
-    console.log('✅ Loaded local jokes immediately');
-  } else {
-    console.warn('No local jokes available, POOR_JOKES is:', POOR_JOKES);
+  // Try to load cached jokes first for instant display
+  try {
+    const cachedData = localStorage.getItem('poorJokes_cachedJokes');
+    const cachedTimestamp = localStorage.getItem('poorJokes_cacheTimestamp');
+    
+    if (cachedData && cachedTimestamp) {
+      const cacheAge = Date.now() - parseInt(cachedTimestamp);
+      const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
+      
+      if (cacheAge < CACHE_MAX_AGE) {
+        const cachedJokes = JSON.parse(cachedData);
+        if (cachedJokes && cachedJokes.length > 0) {
+          allJokes = cachedJokes;
+          console.log(`✅ Loaded ${cachedJokes.length} jokes from cache (${Math.round(cacheAge / 1000)}s old)`);
+          
+          // Show a joke immediately from cache
+          if (!currentJoke) {
+            showRandomJoke();
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('Error loading cached jokes:', error);
   }
   
-  // Then try to load from API in background
+  // Then fetch fresh jokes from API in background
   try {
-    console.log('Attempting to load jokes from API...');
+    console.log('Loading jokes from API...');
     const data = await window.APIManager.request('/jokes');
     
     if (data.success && data.jokes && data.jokes.length > 0) {
       allJokes = data.jokes;
       lastJokesLoad = Date.now();
-      // Don't automatically change the joke - just update the available jokes
-      console.log('✅ Loaded jokes from API (background)');
+      
+      // Cache jokes in localStorage
+      localStorage.setItem('poorJokes_cachedJokes', JSON.stringify(data.jokes));
+      localStorage.setItem('poorJokes_cacheTimestamp', Date.now().toString());
+      
+      // Clean up allSeenJokeIds: remove IDs that don't exist in current joke set
+      const currentJokeIds = new Set(allJokes.map(j => j.id));
+      const beforeSize = allSeenJokeIds.size;
+      
+      // Filter to only keep IDs that exist in current joke set
+      allSeenJokeIds = new Set([...allSeenJokeIds].filter(id => currentJokeIds.has(id)));
+      
+      const removedCount = beforeSize - allSeenJokeIds.size;
+      if (removedCount > 0) {
+        console.log(`🧹 Cleaned up ${removedCount} joke IDs that are no longer active`);
+      }
+      
+      // Save cleaned up set
+      localStorage.setItem('poorJokes_allSeenJokeIds', JSON.stringify([...allSeenJokeIds]));
+      
+      // Migrate jokeFirstSeen to allSeenJokeIds if needed (one-time migration)
+      const firstSeenIds = Object.keys(jokeFirstSeen);
+      if (firstSeenIds.length > 0) {
+        let migratedCount = 0;
+        firstSeenIds.forEach(id => {
+          if (!allSeenJokeIds.has(id) && currentJokeIds.has(id)) {
+            allSeenJokeIds.add(id);
+            migratedCount++;
+          }
+        });
+        if (migratedCount > 0) {
+          localStorage.setItem('poorJokes_allSeenJokeIds', JSON.stringify([...allSeenJokeIds]));
+          console.log(`🔄 Migrated ${migratedCount} jokes from jokeFirstSeen to allSeenJokeIds`);
+        }
+      }
+      
+      // Check for new jokes that haven't been seen before
+      const newJokeCount = allJokes.filter(j => !allSeenJokeIds.has(j.id)).length;
+      
+      // Show a joke if we don't have one displayed yet (or refresh if cache was stale)
+      if (!currentJoke || allJokes.length > 0) {
+        showRandomJoke();
+      }
+      
+      console.log(`✅ Loaded ${data.jokes.length} jokes from API (${newJokeCount} new)`);
     } else {
       console.warn('API returned no jokes or failed:', data);
+      // If we have cached jokes, keep using them
+      if (allJokes.length === 0 && jokeEl) {
+        jokeEl.textContent = 'Sorry, no jokes available right now. Please try again later.';
+      }
     }
   } catch (error) {
     console.error('Error loading jokes from API:', error);
-    // Keep using local jokes as fallback
-  }
-  
-  // If we still have no jokes, show an error message
-  if (allJokes.length === 0) {
-    console.error('No jokes available from any source');
-    if (jokeEl) {
-      jokeEl.textContent = 'Sorry, no jokes available right now. Please try again later.';
+    // If we have cached jokes, keep using them
+    if (allJokes.length === 0 && jokeEl) {
+      jokeEl.textContent = 'Error loading jokes. Please try again later.';
     }
   }
 }
@@ -106,33 +164,63 @@ function showRandomJoke() {
   const availableJokes = getAvailableJokes();
   
   if (availableJokes.length === 0) {
-    // All jokes have been shown recently, reset history and start fresh
+    // All jokes have been seen - check if there are truly no unseen jokes
+    const unseenJokes = allJokes.filter(joke => !allSeenJokeIds.has(joke.id));
+    
+    if (unseenJokes.length === 0) {
+      // User has seen all available jokes
+      console.log('📚 User has seen all available jokes');
+      if (jokeEl) {
+        jokeEl.textContent = "You've seen all available jokes! New jokes are added regularly.";
+      }
+      return;
+    }
+    
+    // There are unseen jokes but they were filtered out by recent history
+    // Reset display history and try again
     console.log('🔄 All jokes shown recently, resetting display history');
     displayHistory = [];
     localStorage.setItem('poorJokes_displayHistory', JSON.stringify(displayHistory));
     
-    // Try again with all jokes available
-    const allAvailableJokes = allJokes.filter(joke => joke.id !== lastJokeId);
-    if (allAvailableJokes.length > 0) {
-      const randomIndex = Math.floor(Math.random() * allAvailableJokes.length);
-      showJoke(allAvailableJokes[randomIndex]);
-    } else {
-      // Only one joke available, show it
-      showJoke(allJokes[0]);
+    // Try again with all unseen jokes (except the last one shown)
+    const allAvailableJokes = unseenJokes.filter(joke => joke.id !== lastJokeId);
+    if (allAvailableJokes.length === 0) {
+      // Only one unseen joke available, show it
+      showJoke(unseenJokes[0]);
+      return;
     }
+    
+    // Pick randomly from unseen jokes
+    const randomIndex = Math.floor(Math.random() * allAvailableJokes.length);
+    showJoke(allAvailableJokes[randomIndex]);
     return;
   }
   
-  // Select random joke from available ones
+  // Select random joke from available ones (all are unseen)
   const randomIndex = Math.floor(Math.random() * availableJokes.length);
   showJoke(availableJokes[randomIndex]);
 }
 
-// Get jokes that haven't been shown recently
+// Get jokes that haven't been seen before (never-repeat system)
 function getAvailableJokes() {
-  // Filter out jokes that have been shown in the last 10 displays
-  const recentJokeIds = displayHistory.slice(-10);
-  return allJokes.filter(joke => !recentJokeIds.includes(joke.id));
+  // Filter out jokes that have been shown in the last N displays (for variety)
+  const recentJokeIds = new Set(displayHistory.slice(-RECENT_JOKES_TO_AVOID));
+  
+  // Filter out ALL jokes that have been seen before (never-repeat)
+  // Only return jokes that haven't been seen AND aren't in recent history
+  const availableJokes = allJokes.filter(joke => {
+    // Must not be in allSeenJokeIds (never seen before)
+    if (allSeenJokeIds.has(joke.id)) {
+      return false;
+    }
+    // Also avoid recent jokes for variety
+    if (recentJokeIds.has(joke.id)) {
+      return false;
+    }
+    return true;
+  });
+  
+  return availableJokes;
 }
 
 // Show specific joke
@@ -142,15 +230,29 @@ function showJoke(joke) {
   
   // Track this joke in display history
   if (joke && joke.id) {
-    // Remove any existing entry for this joke to avoid duplicates
+    // Track when joke was first seen (for analytics)
+    if (!jokeFirstSeen[joke.id]) {
+      jokeFirstSeen[joke.id] = Date.now();
+      localStorage.setItem('poorJokes_jokeFirstSeen', JSON.stringify(jokeFirstSeen));
+      console.log('🆕 First time seeing joke:', joke.id);
+    }
+    
+    // Add to allSeenJokeIds (never-repeat tracking)
+    if (!allSeenJokeIds.has(joke.id)) {
+      allSeenJokeIds.add(joke.id);
+      localStorage.setItem('poorJokes_allSeenJokeIds', JSON.stringify([...allSeenJokeIds]));
+      console.log('📝 Added joke to allSeenJokeIds:', joke.id);
+    }
+    
+    // Remove any existing entry for this joke to avoid duplicates in display history
     displayHistory = displayHistory.filter(id => id !== joke.id);
     
     // Add to end of history
     displayHistory.push(joke.id);
     
-    // Keep only last 20 entries to prevent localStorage from growing too large
-    if (displayHistory.length > 20) {
-      displayHistory = displayHistory.slice(-20);
+    // Keep only last N entries to prevent localStorage from growing too large
+    if (displayHistory.length > MAX_DISPLAY_HISTORY) {
+      displayHistory = displayHistory.slice(-MAX_DISPLAY_HISTORY);
     }
     
     // Save to localStorage
@@ -159,8 +261,8 @@ function showJoke(joke) {
     // Update last joke ID
     lastJokeId = joke.id;
     
-    console.log('📝 Added joke to display history:', joke.id);
     console.log('📊 Display history length:', displayHistory.length);
+    console.log('📊 Total seen jokes:', allSeenJokeIds.size);
   }
   
   if (jokeEl) {
@@ -304,6 +406,7 @@ async function rateJoke(rating) {
       // Could show a subtle error message here if needed
     }
   } catch (error) {
+    // Real joke rating failed - log the error
     console.error('Error rating joke:', error);
     // Rating was already updated optimistically, so user sees immediate feedback
     // Could show a subtle "offline" indicator if needed
@@ -373,9 +476,42 @@ async function submitJokeToAPI() {
   }
 }
 
+// Generate daily random background color based on date
+function setDailyBackground() {
+  // Get today's date as a seed (YYYY-MM-DD format)
+  const today = new Date();
+  const dateString = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+  
+  // Create a simple hash from the date string for consistent color generation
+  let hash = 0;
+  for (let i = 0; i < dateString.length; i++) {
+    hash = dateString.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Generate two colors for gradient based on the hash
+  const hue1 = Math.abs(hash) % 360;
+  const hue2 = (hue1 + 60 + Math.abs(hash % 120)) % 360; // Complementary color with variation
+  
+  // Use HSL for vibrant colors, with good saturation and lightness
+  const saturation = 60 + (Math.abs(hash) % 20); // 60-80% saturation
+  const lightness1 = 50 + (Math.abs(hash) % 15); // 50-65% lightness
+  const lightness2 = 45 + (Math.abs(hash) % 15); // 45-60% lightness
+  
+  const color1 = `hsl(${hue1}, ${saturation}%, ${lightness1}%)`;
+  const color2 = `hsl(${hue2}, ${saturation}%, ${lightness2}%)`;
+  
+  // Apply gradient to body
+  document.body.style.background = `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`;
+  
+  console.log(`🎨 Daily background set: ${color1} → ${color2}`);
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   console.log('DOM loaded, initializing newtab-v2.js');
+  
+  // Set daily random background
+  setDailyBackground();
   
   // Check if required elements exist
   const requiredElements = {
@@ -454,6 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   // Load jokes immediately - don't wait for APIManager
+  // Migration will happen after jokes are loaded
   console.log('Starting to load jokes...');
   loadJokes();
 });
