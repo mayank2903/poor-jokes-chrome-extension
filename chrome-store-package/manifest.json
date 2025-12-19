@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Joor Pokes",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Transform your new tab into a laughter-filled experience with poor jokes, ratings, and community submissions!",
   "permissions": [],
   "chrome_url_overrides": {

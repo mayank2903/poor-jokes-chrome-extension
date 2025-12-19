@@ -25,6 +25,12 @@ let userId = localStorage.getItem('userId') || generateUserId();
 let lastJokesLoad = 0;
 const JOKES_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
+// Pagination tracking
+let totalJokesInDatabase = 0;
+let currentPage = 1;
+let totalPages = 1;
+let isLoadingMoreJokes = false;
+
 // Repeat prevention system
 // Track both display history and when jokes were first seen
 let displayHistory = JSON.parse(localStorage.getItem('poorJokes_displayHistory') || '[]');
@@ -44,6 +50,14 @@ function generateUserId() {
 async function loadJokes() {
   console.log('loadJokes() called');
   
+  // Check if there's already a joke displayed in the DOM (to avoid replacing it)
+  const hasDisplayedJoke = jokeEl && jokeEl.textContent && 
+    jokeEl.textContent.trim() !== '' && 
+    jokeEl.textContent !== 'Loading joke...' &&
+    jokeEl.textContent !== 'No jokes available. Please try again later.' &&
+    jokeEl.textContent !== "You've seen all available jokes! New jokes are added regularly." &&
+    jokeEl.textContent !== "You've seen all available jokes! Loading more...";
+  
   // Try to load cached jokes first for instant display
   try {
     const cachedData = localStorage.getItem('poorJokes_cachedJokes');
@@ -59,9 +73,9 @@ async function loadJokes() {
           allJokes = cachedJokes;
           console.log(`✅ Loaded ${cachedJokes.length} jokes from cache (${Math.round(cacheAge / 1000)}s old)`);
           
-          // Show a joke immediately from cache
-          if (!currentJoke) {
-            showRandomJoke();
+          // Only show a joke if there isn't one already displayed
+          if (!currentJoke && !hasDisplayedJoke) {
+            await showRandomJoke();
           }
         }
       }
@@ -73,11 +87,19 @@ async function loadJokes() {
   // Then fetch fresh jokes from API in background
   try {
     console.log('Loading jokes from API...');
-    const data = await window.APIManager.request('/jokes');
+    const data = await window.APIManager.request('/jokes?limit=100');
     
     if (data.success && data.jokes && data.jokes.length > 0) {
       allJokes = data.jokes;
       lastJokesLoad = Date.now();
+      
+      // Store pagination info
+      if (data.pagination) {
+        totalJokesInDatabase = data.pagination.totalJokes || 0;
+        currentPage = data.pagination.page || 1;
+        totalPages = data.pagination.totalPages || 1;
+        console.log(`📊 Loaded ${allJokes.length} jokes (${totalJokesInDatabase} total available)`);
+      }
       
       // Cache jokes in localStorage
       localStorage.setItem('poorJokes_cachedJokes', JSON.stringify(data.jokes));
@@ -117,9 +139,10 @@ async function loadJokes() {
       // Check for new jokes that haven't been seen before
       const newJokeCount = allJokes.filter(j => !allSeenJokeIds.has(j.id)).length;
       
-      // Show a joke if we don't have one displayed yet (or refresh if cache was stale)
-      if (!currentJoke || allJokes.length > 0) {
-        showRandomJoke();
+      // Only show a new joke if we don't already have one displayed
+      // Check both currentJoke state and existing DOM content to prevent replacing displayed jokes
+      if (!currentJoke && !hasDisplayedJoke) {
+        await showRandomJoke();
       }
       
       console.log(`✅ Loaded ${data.jokes.length} jokes from API (${newJokeCount} new)`);
@@ -144,12 +167,65 @@ async function checkAndRefreshJokes() {
   const now = Date.now();
   if (now - lastJokesLoad > JOKES_REFRESH_INTERVAL) {
     console.log('🔄 Refreshing jokes (older than 5 minutes)');
+    // Reset pagination when refreshing
+    currentPage = 1;
     await loadJokes();
   }
 }
 
+// Load more jokes from next page
+async function loadMoreJokes() {
+  // Check if already loading or no more pages
+  if (isLoadingMoreJokes) {
+    console.log('Already loading more jokes, skipping...');
+    return false;
+  }
+  
+  if (currentPage >= totalPages) {
+    console.log(`No more jokes to load`);
+    return false;
+  }
+  
+  isLoadingMoreJokes = true;
+  
+  try {
+    const nextPage = currentPage + 1;
+    console.log(`📥 Loading more jokes...`);
+    const data = await window.APIManager.request(`/jokes?page=${nextPage}&limit=100`);
+    
+    if (data.success && data.jokes && data.jokes.length > 0) {
+      // Append new jokes to existing ones (avoid duplicates)
+      const existingIds = new Set(allJokes.map(j => j.id));
+      const newJokes = data.jokes.filter(j => !existingIds.has(j.id));
+      
+      allJokes = [...allJokes, ...newJokes];
+      currentPage = nextPage;
+      
+      // Update pagination info
+      if (data.pagination) {
+        totalJokesInDatabase = data.pagination.totalJokes || totalJokesInDatabase;
+        totalPages = data.pagination.totalPages || totalPages;
+      }
+      
+      // Update cache with all jokes
+      localStorage.setItem('poorJokes_cachedJokes', JSON.stringify(allJokes));
+      
+      console.log(`✅ Loaded ${newJokes.length} new jokes (total: ${allJokes.length}/${totalJokesInDatabase})`);
+      return true;
+    } else {
+      console.warn('No more jokes available from API');
+      return false;
+    }
+  } catch (error) {
+    console.error('Error loading more jokes:', error);
+    return false;
+  } finally {
+    isLoadingMoreJokes = false;
+  }
+}
+
 // Show random joke with repeat prevention
-function showRandomJoke() {
+async function showRandomJoke() {
   console.log('showRandomJoke() called, allJokes.length:', allJokes.length);
   
   if (allJokes.length === 0) {
@@ -168,10 +244,36 @@ function showRandomJoke() {
     const unseenJokes = allJokes.filter(joke => !allSeenJokeIds.has(joke.id));
     
     if (unseenJokes.length === 0) {
-      // User has seen all available jokes
-      console.log('📚 User has seen all available jokes');
+      // User has seen all jokes from current batch
+      console.log('📚 User has seen all loaded jokes');
+      
+      // Check if there are more jokes in database we haven't loaded
+      const loadedJokesCount = allJokes.length;
+      const hasMoreJokes = totalJokesInDatabase > 0 && loadedJokesCount < totalJokesInDatabase;
+      
+      if (hasMoreJokes) {
+        // Automatically load more jokes
+        console.log(`🔄 Auto-loading more jokes (${loadedJokesCount}/${totalJokesInDatabase} loaded)`);
+        const loaded = await loadMoreJokes();
+        
+        if (loaded) {
+          // Try again with newly loaded jokes
+          const newAvailableJokes = getAvailableJokes();
+          if (newAvailableJokes.length > 0) {
+            const randomIndex = Math.floor(Math.random() * newAvailableJokes.length);
+            showJoke(newAvailableJokes[randomIndex]);
+            return;
+          }
+        }
+      }
+      
+      // Either no more jokes, or we've loaded all jokes from database
       if (jokeEl) {
-        jokeEl.textContent = "You've seen all available jokes! New jokes are added regularly.";
+        if (totalJokesInDatabase > 0 && loadedJokesCount >= totalJokesInDatabase) {
+          jokeEl.textContent = "You've seen all available jokes! New jokes are added regularly.";
+        } else {
+          jokeEl.textContent = "You've seen all available jokes! Loading more...";
+        }
       }
       return;
     }
@@ -223,6 +325,41 @@ function getAvailableJokes() {
   return availableJokes;
 }
 
+// Format joke content with one sentence per line
+function formatJokeContent(content) {
+  if (!content) return '';
+  
+  // Split by sentence endings (. ! ?) followed by space or end of string
+  // This regex splits on punctuation followed by optional whitespace
+  const sentences = content
+    .split(/([.!?]+)\s*/)
+    .filter(s => s.trim().length > 0)
+    .map(s => s.trim());
+  
+  // Recombine sentences with their punctuation
+  const formattedSentences = [];
+  for (let i = 0; i < sentences.length; i++) {
+    const current = sentences[i];
+    // Check if next item is punctuation
+    if (i < sentences.length - 1 && /^[.!?]+$/.test(sentences[i + 1])) {
+      // Combine sentence with its punctuation
+      formattedSentences.push(current + sentences[i + 1]);
+      i++; // Skip the punctuation since we combined it
+    } else if (!/^[.!?]+$/.test(current)) {
+      // It's a sentence without trailing punctuation (might be last sentence)
+      formattedSentences.push(current);
+    }
+  }
+  
+  // If we didn't get proper sentences, return original content
+  if (formattedSentences.length === 0) {
+    return content;
+  }
+  
+  // Join sentences with line breaks
+  return formattedSentences.join('\n');
+}
+
 // Show specific joke
 function showJoke(joke) {
   console.log('showJoke() called with:', joke);
@@ -266,7 +403,8 @@ function showJoke(joke) {
   }
   
   if (jokeEl) {
-    jokeEl.textContent = joke.content;
+    const formattedContent = formatJokeContent(joke.content);
+    jokeEl.textContent = formattedContent;
     console.log('Displayed joke:', joke.content);
   } else {
     console.error('jokeEl is null, cannot display joke');
@@ -540,11 +678,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Set up event listeners after DOM is loaded
   if (nextJokeBtn) {
-    nextJokeBtn.addEventListener('click', () => {
+    nextJokeBtn.addEventListener('click', async () => {
       // Check if we need to refresh jokes before showing next
-      checkAndRefreshJokes().then(() => {
-        showRandomJoke();
-      });
+      await checkAndRefreshJokes();
+      await showRandomJoke();
     });
     console.log('Added event listener to nextJokeBtn');
   }
