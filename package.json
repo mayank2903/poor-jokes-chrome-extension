@@ -1,6 +1,6 @@
 {
   "name": "poor-jokes-newtab",
-  "version": "1.0.2",
+  "version": "1.0.6",
   "description": "A new tab extension that shows poor jokes with rating and submission system",
   "main": "index.js",
   "scripts": {

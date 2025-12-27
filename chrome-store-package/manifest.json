@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Joor Pokes",
-  "version": "1.0.2",
+  "version": "1.0.6",
   "description": "Transform your new tab into a laughter-filled experience with poor jokes, ratings, and community submissions!",
   "permissions": [],
   "chrome_url_overrides": {
@@ -18,8 +18,14 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["styles.css", "js/*", "icons/*"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "styles.css",
+        "js/*",
+        "icons/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "author": "Poor Jokes Team",

@@ -7,14 +7,81 @@ const { execSync } = require('child_process');
 
 class StorePackager {
   constructor() {
-    this.version = this.getVersion();
     this.packageDir = 'chrome-store-package';
+    this.version = this.incrementVersion();
     this.zipFile = `poor-jokes-newtab-v${this.version}.zip`;
   }
 
   getVersion() {
+    // Read from manifest-store.json as source of truth for extension version
+    if (fs.existsSync('manifest-store.json')) {
+      const manifest = JSON.parse(fs.readFileSync('manifest-store.json', 'utf8'));
+      return manifest.version;
+    }
+    // Fallback to package.json
     const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
     return packageJson.version;
+  }
+
+  incrementVersion() {
+    const currentVersion = this.getVersion();
+    const versionParts = currentVersion.split('.');
+    const major = parseInt(versionParts[0]) || 1;
+    const minor = parseInt(versionParts[1]) || 0;
+    const patch = parseInt(versionParts[2]) || 0;
+    
+    // Increment patch version
+    const newVersion = `${major}.${minor}.${patch + 1}`;
+    
+    console.log(`📦 Incrementing version: ${currentVersion} → ${newVersion}`);
+    
+    // Update manifest-store.json
+    if (fs.existsSync('manifest-store.json')) {
+      const manifest = JSON.parse(fs.readFileSync('manifest-store.json', 'utf8'));
+      manifest.version = newVersion;
+      fs.writeFileSync('manifest-store.json', JSON.stringify(manifest, null, 2) + '\n');
+      console.log('✅ Updated manifest-store.json');
+    }
+    
+    // Update chrome-store-package/manifest.json if it exists
+    if (fs.existsSync('chrome-store-package/manifest.json')) {
+      const manifest = JSON.parse(fs.readFileSync('chrome-store-package/manifest.json', 'utf8'));
+      manifest.version = newVersion;
+      fs.writeFileSync('chrome-store-package/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+      console.log('✅ Updated chrome-store-package/manifest.json');
+    }
+    
+    // Update package.json
+    const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    packageJson.version = newVersion;
+    fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2) + '\n');
+    console.log('✅ Updated package.json');
+    
+    // Update cache-busting version in HTML files
+    this.updateHtmlCacheBusting(newVersion);
+    
+    return newVersion;
+  }
+
+  updateHtmlCacheBusting(version) {
+    const htmlFiles = ['newtab.html', 'chrome-store-package/newtab.html'];
+    
+    htmlFiles.forEach(filePath => {
+      if (fs.existsSync(filePath)) {
+        let content = fs.readFileSync(filePath, 'utf8');
+        
+        // Update cache-busting version in all script and link tags
+        content = content.replace(/href="([^"]+\.css)\?v=[\d.]+"/g, `href="$1?v=${version}"`);
+        content = content.replace(/src="([^"]+\.js)\?v=[\d.]+"/g, `src="$1?v=${version}"`);
+        
+        // If no version parameter exists, add it
+        content = content.replace(/href="([^"]+\.css)"/g, `href="$1?v=${version}"`);
+        content = content.replace(/src="([^"]+\.js)"/g, `src="$1?v=${version}"`);
+        
+        fs.writeFileSync(filePath, content);
+        console.log(`✅ Updated cache-busting in ${filePath}`);
+      }
+    });
   }
 
   // Create package directory
